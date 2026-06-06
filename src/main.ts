@@ -1,5 +1,6 @@
 import './style.css';
 import bargainingFactions from './data/factions.json';
+import territories from './data/territories.json';
 import {
   generateBargainingAIMessage,
   generateFactionChatMessage,
@@ -25,8 +26,20 @@ import type { Inventory as BargainInventory } from './game/trade';
 type GoodId = 'medicine' | 'ore' | 'star_silk' | 'alien_relics';
 type SupplyId = 'food' | 'water' | 'fuel';
 type TradeItemId = GoodId | SupplyId;
-type LocationId = 'vega' | 'sirius' | 'nova7';
+type LocationId = 'vega' | 'sirius' | 'nova7' | 'orca_prime' | 'celestia_wisp' | 'titan_forge' | 'aurora_outpost' | 'zenith_hub';
 type StockId = 'vega_credit' | 'sirius_ore' | 'nova_life' | 'caravan_lux' | 'dust_salvage';
+type TerritoryType = 'mining' | 'logistics' | 'water';
+type TerritoryOwner = 'vega_union' | 'eclipse_combine' | 'nova_frontier';
+type Territory = {
+  name: string;
+  owner: TerritoryOwner;
+  type: TerritoryType;
+  basePrice: number;
+  resourceOutput: Record<string, number>;
+  strategicValue: number;
+  isForSale: boolean;
+  leaseAllowed: boolean;
+};
 type FactionId =
   | 'vega_exchange'
   | 'sirius_guild'
@@ -36,7 +49,7 @@ type FactionId =
 type AllianceStatus = 'none' | 'trade_pact' | 'alliance';
 type FactionStance = 'ally' | 'friendly' | 'neutral' | 'rival' | 'hostile';
 type SidebarTab = 'market' | 'ledger' | 'bargain';
-type LogTab = 'conversation' | 'account' | 'stocks';
+type LogTab = 'conversation' | 'account' | 'stocks' | 'realty' | 'world' | 'map';
 type StockLeverage = 1 | 2 | 3;
 
 type Good = {
@@ -100,6 +113,85 @@ type StockPosition = {
   shares: number;
   averagePrice: number;
   averageLeverage: number;
+};
+
+type StarSystemId =
+  | 'vega_system'
+  | 'sirius_system'
+  | 'nova7_system'
+  | 'orca_system'
+  | 'celestia_system'
+  | 'titan_system'
+  | 'aurora_system'
+  | 'zenith_system';
+type PlanetId =
+  | 'vega_orbital'
+  | 'vega_citadel'
+  | 'vega_outpost'
+  | 'sirius_mines'
+  | 'sirius_ring'
+  | 'sirius_harborage'
+  | 'nova_colony'
+  | 'nova_reef'
+  | 'nova_plateau'
+  | 'orca_anchor'
+  | 'orca_relay'
+  | 'orca_refuge'
+  | 'celestia_spire'
+  | 'celestia_veil'
+  | 'celestia_oasis'
+  | 'titan_arch'
+  | 'titan_maw'
+  | 'titan_foundry'
+  | 'aurora_stead'
+  | 'aurora_basin'
+  | 'aurora_shard'
+  | 'zenith_peak'
+  | 'zenith_spin'
+  | 'zenith_haven';
+
+type StarType = 'blue_white' | 'red_dwarf' | 'binary' | 'neutron';
+type PlanetType = 'habitable' | 'ice' | 'gas_giant' | 'asteroid' | 'ocean';
+
+type RealEstatePropertyType = 'colony_dome' | 'orbital_tower' | 'ring_estate' | 'habitat_hub';
+type PropertyQuality = 'low' | 'medium' | 'high';
+type PropertyOwner = 'player' | FactionId | 'neutral';
+
+type StarSystem = {
+  id: StarSystemId;
+  name: string;
+  starType: StarType;
+  factionId: FactionId;
+  planetIds: PlanetId[];
+  regionBonus: number;
+  owner: PropertyOwner;
+};
+
+type Planet = {
+  id: PlanetId;
+  name: string;
+  systemId: StarSystemId;
+  type: PlanetType;
+  hazard: string;
+  resourceDemand: Partial<Record<TradeItemId, number>>;
+  owner: PropertyOwner;
+};
+
+type RealEstateProperty = {
+  id: string;
+  name: string;
+  systemId: StarSystemId;
+  planetId: PlanetId;
+  propertyType: RealEstatePropertyType;
+  basePrice: number;
+  rent: number;
+  maintenance: number;
+  occupancy: number;
+  quality: PropertyQuality;
+  isForSale: boolean;
+  leaseAllowed: boolean;
+  isLeased?: boolean;
+  owner: PropertyOwner;
 };
 
 type Faction = {
@@ -363,6 +455,131 @@ const locations: Record<LocationId, Location> = {
       },
     ],
   },
+  orca_prime: {
+    id: 'orca_prime',
+    name: 'Orca Prime Station',
+    description: 'A twin-core relay station with active trading lanes.',
+    governingFaction: 'free_caravans',
+    routes: {
+      vega: 20,
+      sirius: 20,
+      nova7: 22,
+    },
+    vendors: [
+      {
+        id: 'orca-lira',
+        name: 'Lira Tand',
+        role: 'Route Broker',
+        factionId: 'free_caravans',
+        bio: 'Matches rare cargo with hidden orbital buyers.',
+        stock: [
+          { itemId: 'star_silk', kind: 'good', ask: 258, bid: 182 },
+          { itemId: 'fuel', kind: 'supply', ask: 9 },
+          { itemId: 'food', kind: 'supply', ask: 16 },
+        ],
+      },
+    ],
+  },
+  celestia_wisp: {
+    id: 'celestia_wisp',
+    name: 'Celestia Wisp Outpost',
+    description: 'A drifting observatory in a quiet fringe sector.',
+    governingFaction: 'vega_exchange',
+    routes: {
+      vega: 18,
+      orca_prime: 18,
+      titan_forge: 22,
+    },
+    vendors: [
+      {
+        id: 'celestia-mara',
+        name: 'Mara Quell',
+        role: 'Supply Broker',
+        factionId: 'vega_exchange',
+        bio: 'Keeps a close watch on food lines and anomaly premiums.',
+        stock: [
+          { itemId: 'water', kind: 'supply', ask: 11 },
+          { itemId: 'medicine', kind: 'good', ask: 148, bid: 108 },
+          { itemId: 'fuel', kind: 'supply', ask: 8 },
+        ],
+      },
+    ],
+  },
+  titan_forge: {
+    id: 'titan_forge',
+    name: 'Titan Forge Base',
+    description: 'A hardline industrial platform in a storm-wracked belt.',
+    governingFaction: 'dust_runners',
+    routes: {
+      sirius: 20,
+      orca_prime: 22,
+      aurora_outpost: 18,
+    },
+    vendors: [
+      {
+        id: 'titan-gree',
+        name: 'Gree Mal',
+        role: 'Ore Handler',
+        factionId: 'dust_runners',
+        bio: 'Specializes in bulk minerals and off-label supplies.',
+        stock: [
+          { itemId: 'ore', kind: 'good', ask: 28, bid: 16 },
+          { itemId: 'fuel', kind: 'supply', ask: 9 },
+          { itemId: 'water', kind: 'supply', ask: 13 },
+        ],
+      },
+    ],
+  },
+  aurora_outpost: {
+    id: 'aurora_outpost',
+    name: 'Aurora Outpost',
+    description: 'An emerging relief hub with steady water supplies.',
+    governingFaction: 'nova_relief',
+    routes: {
+      nova7: 18,
+      titan_forge: 18,
+      zenith_hub: 20,
+    },
+    vendors: [
+      {
+        id: 'aurora-sen',
+        name: 'Sen Aori',
+        role: 'Water and Food Broker',
+        factionId: 'nova_relief',
+        bio: 'Stocks essentials and keeps bargain prices in check.',
+        stock: [
+          { itemId: 'water', kind: 'supply', ask: 10 },
+          { itemId: 'food', kind: 'supply', ask: 14 },
+          { itemId: 'medicine', kind: 'good', ask: 154, bid: 118 },
+        ],
+      },
+    ],
+  },
+  zenith_hub: {
+    id: 'zenith_hub',
+    name: 'Zenith Hub',
+    description: 'A high-altitude beacon station near a volatile binary.',
+    governingFaction: 'sirius_guild',
+    routes: {
+      aurora_outpost: 20,
+      nova7: 22,
+      sirius: 23,
+    },
+    vendors: [
+      {
+        id: 'zenith-mor',
+        name: 'Mor Kest',
+        role: 'High-Risk Trader',
+        factionId: 'sirius_guild',
+        bio: 'Deals in exotic fuel blends and rare extracted goods.',
+        stock: [
+          { itemId: 'ore', kind: 'good', ask: 36, bid: 22 },
+          { itemId: 'star_silk', kind: 'good', ask: 268, bid: 190 },
+          { itemId: 'fuel', kind: 'supply', ask: 11 },
+        ],
+      },
+    ],
+  },
 };
 
 const player: Player = {
@@ -496,9 +713,28 @@ let activeLogTab: LogTab = 'conversation';
 let infoScreenOpen = false;
 let selectedVendorId: string | null = null;
 let stockLeverage: StockLeverage = 1;
+let selectedMapSystem: StarSystemId | null = null;
+let lastStarNavigationDay = 0;
 const conversationEntries: string[] = [];
 const accountEntries: string[] = [];
 const stockPositions: Partial<Record<StockId, StockPosition>> = {};
+const stockTotalShares: Record<StockId, number> = {
+  vega_credit: 100,
+  sirius_ore: 100,
+  nova_life: 100,
+  caravan_lux: 100,
+  dust_salvage: 100,
+};
+const hostileTakeovers: Record<StockId, boolean> = {
+  vega_credit: false,
+  sirius_ore: false,
+  nova_life: false,
+  caravan_lux: false,
+  dust_salvage: false,
+};
+const mergedStockPairs: Set<string> = new Set();
+let allianceETFActive = false;
+
 const stockMarketBias: Record<StockId, number> = {
   vega_credit: 0,
   sirius_ore: 0,
@@ -506,6 +742,484 @@ const stockMarketBias: Record<StockId, number> = {
   caravan_lux: 0,
   dust_salvage: 0,
 };
+
+const starSystems: Record<StarSystemId, StarSystem> = {
+  vega_system: {
+    id: 'vega_system',
+    name: 'Vega System',
+    starType: 'blue_white',
+    factionId: 'vega_exchange',
+    planetIds: ['vega_orbital', 'vega_citadel', 'vega_outpost'],
+    regionBonus: 0.06,
+    owner: 'neutral',
+  },
+  sirius_system: {
+    id: 'sirius_system',
+    name: 'Sirius System',
+    starType: 'red_dwarf',
+    factionId: 'sirius_guild',
+    planetIds: ['sirius_mines', 'sirius_ring', 'sirius_harborage'],
+    regionBonus: 0.04,
+    owner: 'neutral',
+  },
+  nova7_system: {
+    id: 'nova7_system',
+    name: 'Nova-7 System',
+    starType: 'red_dwarf',
+    factionId: 'nova_relief',
+    planetIds: ['nova_colony', 'nova_reef', 'nova_plateau'],
+    regionBonus: 0.05,
+    owner: 'neutral',
+  },
+  orca_system: {
+    id: 'orca_system',
+    name: 'Orca Prime System',
+    starType: 'binary',
+    factionId: 'free_caravans',
+    planetIds: ['orca_anchor', 'orca_relay', 'orca_refuge'],
+    regionBonus: 0.03,
+    owner: 'neutral',
+  },
+  celestia_system: {
+    id: 'celestia_system',
+    name: 'Celestia Wisp System',
+    starType: 'blue_white',
+    factionId: 'vega_exchange',
+    planetIds: ['celestia_spire', 'celestia_veil', 'celestia_oasis'],
+    regionBonus: 0.05,
+    owner: 'neutral',
+  },
+  titan_system: {
+    id: 'titan_system',
+    name: 'Titan Forge System',
+    starType: 'neutron',
+    factionId: 'dust_runners',
+    planetIds: ['titan_arch', 'titan_maw', 'titan_foundry'],
+    regionBonus: 0.02,
+    owner: 'neutral',
+  },
+  aurora_system: {
+    id: 'aurora_system',
+    name: 'Aurora Outpost System',
+    starType: 'red_dwarf',
+    factionId: 'nova_relief',
+    planetIds: ['aurora_stead', 'aurora_basin', 'aurora_shard'],
+    regionBonus: 0.04,
+    owner: 'neutral',
+  },
+  zenith_system: {
+    id: 'zenith_system',
+    name: 'Zenith Hub System',
+    starType: 'binary',
+    factionId: 'sirius_guild',
+    planetIds: ['zenith_peak', 'zenith_spin', 'zenith_haven'],
+    regionBonus: 0.04,
+    owner: 'neutral',
+  },
+};
+
+const expandedSystems: Record<StarSystemId, boolean> = Object.keys(starSystems).reduce((acc, id) => {
+  acc[id as StarSystemId] = false;
+  return acc;
+}, {} as Record<StarSystemId, boolean>);
+
+const planets: Record<PlanetId, Planet> = {
+  vega_orbital: {
+    id: 'vega_orbital',
+    name: 'Vega Orbital Ring',
+    systemId: 'vega_system',
+    type: 'habitable',
+    hazard: 'radiation storms',
+    resourceDemand: { water: 0.18, food: 0.2, fuel: 0.14 },
+    owner: 'neutral',
+  },
+  vega_citadel: {
+    id: 'vega_citadel',
+    name: 'Vega Citadel',
+    systemId: 'vega_system',
+    type: 'ocean',
+    hazard: 'solar flare drift',
+    resourceDemand: { water: 0.16, food: 0.12, fuel: 0.12 },
+    owner: 'neutral',
+  },
+  vega_outpost: {
+    id: 'vega_outpost',
+    name: 'Vega Outpost',
+    systemId: 'vega_system',
+    type: 'asteroid',
+    hazard: 'debris fields',
+    resourceDemand: { fuel: 0.18, ore: 0.14 },
+    owner: 'neutral',
+  },
+  sirius_mines: {
+    id: 'sirius_mines',
+    name: 'Sirius Mining Belt',
+    systemId: 'sirius_system',
+    type: 'asteroid',
+    hazard: 'micro-meteor showers',
+    resourceDemand: { fuel: 0.16, ore: 0.22 },
+    owner: 'neutral',
+  },
+  sirius_ring: {
+    id: 'sirius_ring',
+    name: 'Sirius Ring Colony',
+    systemId: 'sirius_system',
+    type: 'gas_giant',
+    hazard: 'ion storms',
+    resourceDemand: { fuel: 0.18, water: 0.08 },
+    owner: 'neutral',
+  },
+  sirius_harborage: {
+    id: 'sirius_harborage',
+    name: 'Sirius Harborage',
+    systemId: 'sirius_system',
+    type: 'ice',
+    hazard: 'crystal winds',
+    resourceDemand: { water: 0.2, fuel: 0.1 },
+    owner: 'neutral',
+  },
+  nova_colony: {
+    id: 'nova_colony',
+    name: 'Nova-7 Habitat Dome',
+    systemId: 'nova7_system',
+    type: 'ocean',
+    hazard: 'storm surges',
+    resourceDemand: { water: 0.24, medicine: 0.18, food: 0.16 },
+    owner: 'neutral',
+  },
+  nova_reef: {
+    id: 'nova_reef',
+    name: 'Nova Reef Platform',
+    systemId: 'nova7_system',
+    type: 'habitable',
+    hazard: 'acid rain',
+    resourceDemand: { water: 0.18, food: 0.14, fuel: 0.08 },
+    owner: 'neutral',
+  },
+  nova_plateau: {
+    id: 'nova_plateau',
+    name: 'Nova Plateau Station',
+    systemId: 'nova7_system',
+    type: 'ice',
+    hazard: 'tempest gales',
+    resourceDemand: { water: 0.18, fuel: 0.12 },
+    owner: 'neutral',
+  },
+  orca_anchor: {
+    id: 'orca_anchor',
+    name: 'Orca Anchor',
+    systemId: 'orca_system',
+    type: 'habitable',
+    hazard: 'radio bursts',
+    resourceDemand: { food: 0.18, water: 0.16, fuel: 0.12 },
+    owner: 'neutral',
+  },
+  orca_relay: {
+    id: 'orca_relay',
+    name: 'Orca Relay Station',
+    systemId: 'orca_system',
+    type: 'asteroid',
+    hazard: 'gravity wells',
+    resourceDemand: { fuel: 0.18, ore: 0.14 },
+    owner: 'neutral',
+  },
+  orca_refuge: {
+    id: 'orca_refuge',
+    name: 'Orca Refuge',
+    systemId: 'orca_system',
+    type: 'ocean',
+    hazard: 'electrostatic storms',
+    resourceDemand: { water: 0.2, food: 0.12, fuel: 0.1 },
+    owner: 'neutral',
+  },
+  celestia_spire: {
+    id: 'celestia_spire',
+    name: 'Celestia Spire',
+    systemId: 'celestia_system',
+    type: 'habitable',
+    hazard: 'plasma winds',
+    resourceDemand: { water: 0.2, medicine: 0.16, food: 0.12 },
+    owner: 'neutral',
+  },
+  celestia_veil: {
+    id: 'celestia_veil',
+    name: 'Celestia Veil',
+    systemId: 'celestia_system',
+    type: 'ice',
+    hazard: 'frozen gales',
+    resourceDemand: { water: 0.18, fuel: 0.14 },
+    owner: 'neutral',
+  },
+  celestia_oasis: {
+    id: 'celestia_oasis',
+    name: 'Celestia Oasis',
+    systemId: 'celestia_system',
+    type: 'ocean',
+    hazard: 'acid rain',
+    resourceDemand: { water: 0.22, food: 0.12, fuel: 0.08 },
+    owner: 'neutral',
+  },
+  titan_arch: {
+    id: 'titan_arch',
+    name: 'Titan Archipelago',
+    systemId: 'titan_system',
+    type: 'gas_giant',
+    hazard: 'magnetic shear',
+    resourceDemand: { fuel: 0.2, water: 0.1 },
+    owner: 'neutral',
+  },
+  titan_maw: {
+    id: 'titan_maw',
+    name: 'Titan Maw',
+    systemId: 'titan_system',
+    type: 'asteroid',
+    hazard: 'shrapnel storms',
+    resourceDemand: { fuel: 0.16, ore: 0.18 },
+    owner: 'neutral',
+  },
+  titan_foundry: {
+    id: 'titan_foundry',
+    name: 'Titan Foundry',
+    systemId: 'titan_system',
+    type: 'habitable',
+    hazard: 'thermal surges',
+    resourceDemand: { food: 0.16, water: 0.14, fuel: 0.1 },
+    owner: 'neutral',
+  },
+  aurora_stead: {
+    id: 'aurora_stead',
+    name: 'Aurora Stead',
+    systemId: 'aurora_system',
+    type: 'habitable',
+    hazard: 'charged fog',
+    resourceDemand: { food: 0.18, water: 0.18, fuel: 0.08 },
+    owner: 'neutral',
+  },
+  aurora_basin: {
+    id: 'aurora_basin',
+    name: 'Aurora Basin',
+    systemId: 'aurora_system',
+    type: 'ice',
+    hazard: 'crystal winds',
+    resourceDemand: { water: 0.2, fuel: 0.12 },
+    owner: 'neutral',
+  },
+  aurora_shard: {
+    id: 'aurora_shard',
+    name: 'Aurora Shard',
+    systemId: 'aurora_system',
+    type: 'asteroid',
+    hazard: 'sharp debris',
+    resourceDemand: { fuel: 0.18, ore: 0.16 },
+    owner: 'neutral',
+  },
+  zenith_peak: {
+    id: 'zenith_peak',
+    name: 'Zenith Peak',
+    systemId: 'zenith_system',
+    type: 'habitable',
+    hazard: 'high radiation',
+    resourceDemand: { water: 0.2, food: 0.14, fuel: 0.1 },
+    owner: 'neutral',
+  },
+  zenith_spin: {
+    id: 'zenith_spin',
+    name: 'Zenith Spin',
+    systemId: 'zenith_system',
+    type: 'gas_giant',
+    hazard: 'vortex storms',
+    resourceDemand: { fuel: 0.22, water: 0.08 },
+    owner: 'neutral',
+  },
+  zenith_haven: {
+    id: 'zenith_haven',
+    name: 'Zenith Haven',
+    systemId: 'zenith_system',
+    type: 'ocean',
+    hazard: 'ion tides',
+    resourceDemand: { food: 0.16, water: 0.18, fuel: 0.08 },
+    owner: 'neutral',
+  },
+};
+
+type GalaxyStar = {
+  id: string;
+  name: string;
+  systemId?: StarSystemId;
+  x: number;
+  y: number;
+};
+
+const galaxyStars: GalaxyStar[] = [
+  { id: 'vega_star', name: 'Vega', systemId: 'vega_system', x: 120, y: 90 },
+  { id: 'orca_prime', name: 'Orca Prime', systemId: 'orca_system', x: 240, y: 65 },
+  { id: 'celestia_wisp', name: 'Celestia Wisp', systemId: 'celestia_system', x: 90, y: 240 },
+  { id: 'sirius_star', name: 'Sirius', systemId: 'sirius_system', x: 340, y: 175 },
+  { id: 'titan_forge', name: 'Titan Forge', systemId: 'titan_system', x: 220, y: 230 },
+  { id: 'aurora_outpost', name: 'Aurora Outpost', systemId: 'aurora_system', x: 410, y: 280 },
+  { id: 'nova7_star', name: 'Nova-7', systemId: 'nova7_system', x: 560, y: 95 },
+  { id: 'zenith_hub', name: 'Zenith Hub', systemId: 'zenith_system', x: 640, y: 220 },
+];
+
+const locationToStarSystem: Record<LocationId, StarSystemId> = {
+  vega: 'vega_system',
+  orca_prime: 'orca_system',
+  celestia_wisp: 'celestia_system',
+  sirius: 'sirius_system',
+  titan_forge: 'titan_system',
+  aurora_outpost: 'aurora_system',
+  nova7: 'nova7_system',
+  zenith_hub: 'zenith_system',
+};
+
+const starSystemToLocation: Record<StarSystemId, LocationId> = {
+  vega_system: 'vega',
+  orca_system: 'orca_prime',
+  celestia_system: 'celestia_wisp',
+  sirius_system: 'sirius',
+  titan_system: 'titan_forge',
+  aurora_system: 'aurora_outpost',
+  nova7_system: 'nova7',
+  zenith_system: 'zenith_hub',
+};
+
+const systemPlanetPositions: Record<StarSystemId, Array<{ x: number; y: number; labelX: number; labelY: number }>> = {
+  vega_system: [
+    { x: 300, y: 80, labelX: 320, labelY: 75 },
+    { x: 240, y: 148, labelX: 210, labelY: 142 },
+    { x: 330, y: 210, labelX: 360, labelY: 206 },
+  ],
+  orca_system: [
+    { x: 310, y: 90, labelX: 330, labelY: 86 },
+    { x: 260, y: 160, labelX: 240, labelY: 158 },
+    { x: 345, y: 205, labelX: 368, labelY: 208 },
+  ],
+  celestia_system: [
+    { x: 295, y: 110, labelX: 320, labelY: 106 },
+    { x: 235, y: 175, labelX: 215, labelY: 170 },
+    { x: 355, y: 215, labelX: 375, labelY: 220 },
+  ],
+  sirius_system: [
+    { x: 320, y: 100, labelX: 345, labelY: 96 },
+    { x: 230, y: 180, labelX: 210, labelY: 185 },
+    { x: 345, y: 225, labelX: 368, labelY: 230 },
+  ],
+  titan_system: [
+    { x: 310, y: 95, labelX: 330, labelY: 92 },
+    { x: 255, y: 170, labelX: 235, labelY: 168 },
+    { x: 360, y: 205, labelX: 380, labelY: 208 },
+  ],
+  aurora_system: [
+    { x: 300, y: 85, labelX: 325, labelY: 82 },
+    { x: 240, y: 155, labelX: 220, labelY: 150 },
+    { x: 350, y: 215, labelX: 370, labelY: 220 },
+  ],
+  nova7_system: [
+    { x: 305, y: 95, labelX: 325, labelY: 90 },
+    { x: 382, y: 150, labelX: 406, labelY: 148 },
+    { x: 300, y: 220, labelX: 280, labelY: 224 },
+  ],
+  zenith_system: [
+    { x: 315, y: 105, labelX: 335, labelY: 100 },
+    { x: 250, y: 180, labelX: 230, labelY: 178 },
+    { x: 365, y: 210, labelX: 385, labelY: 212 },
+  ],
+};
+
+const properties: Record<string, RealEstateProperty> = {
+  vega_arcology: {
+    id: 'vega_arcology',
+    name: 'Vega Arcology Tower',
+    systemId: 'vega_system',
+    planetId: 'vega_orbital',
+    propertyType: 'orbital_tower',
+    basePrice: 780,
+    rent: 42,
+    maintenance: 10,
+    occupancy: 0.68,
+    quality: 'high',
+    isForSale: true,
+    leaseAllowed: true,
+    isLeased: false,
+    owner: 'neutral',
+  },
+  sirius_cluster: {
+    id: 'sirius_cluster',
+    name: 'Sirius Miner Cluster',
+    systemId: 'sirius_system',
+    planetId: 'sirius_mines',
+    propertyType: 'habitat_hub',
+    basePrice: 520,
+    rent: 28,
+    maintenance: 8,
+    occupancy: 0.55,
+    quality: 'medium',
+    isForSale: true,
+    leaseAllowed: true,
+    isLeased: false,
+    owner: 'neutral',
+  },
+  nova_life_dome: {
+    id: 'nova_life_dome',
+    name: 'Nova Life Dome',
+    systemId: 'nova7_system',
+    planetId: 'nova_colony',
+    propertyType: 'colony_dome',
+    basePrice: 640,
+    rent: 34,
+    maintenance: 9,
+    occupancy: 0.62,
+    quality: 'high',
+    isForSale: true,
+    leaseAllowed: true,
+    isLeased: false,
+    owner: 'neutral',
+  },
+  orca_anchor_estate: {
+    id: 'orca_anchor_estate',
+    name: 'Orca Anchor Ring Estate',
+    systemId: 'orca_system',
+    planetId: 'orca_anchor',
+    propertyType: 'ring_estate',
+    basePrice: 590,
+    rent: 32,
+    maintenance: 9,
+    occupancy: 0.60,
+    quality: 'medium',
+    isForSale: true,
+    leaseAllowed: true,
+    isLeased: false,
+    owner: 'neutral',
+  },
+  aurora_habitat_hub: {
+    id: 'aurora_habitat_hub',
+    name: 'Aurora Basin Habitat Hub',
+    systemId: 'aurora_system',
+    planetId: 'aurora_basin',
+    propertyType: 'habitat_hub',
+    basePrice: 710,
+    rent: 38,
+    maintenance: 11,
+    occupancy: 0.64,
+    quality: 'high',
+    isForSale: true,
+    leaseAllowed: true,
+    isLeased: false,
+    owner: 'neutral',
+  },
+};
+
+const propertyIds = Object.keys(properties);
+
+const starHarvests: Record<StarSystemId, number> = Object.keys(starSystems).reduce((acc, id) => {
+  acc[id as StarSystemId] = 0;
+  return acc;
+}, {} as Record<StarSystemId, number>);
+
+const planetHarvests: Record<PlanetId, number> = Object.keys(planets).reduce((acc, id) => {
+  acc[id as PlanetId] = 0;
+  return acc;
+}, {} as Record<PlanetId, number>);
 
 const app = document.querySelector<HTMLDivElement>('#app');
 
@@ -530,6 +1244,9 @@ app.innerHTML = `
           <button id="log-tab-conversation" class="tab-button">COMMS</button>
           <button id="log-tab-account" class="tab-button">ACCOUNT</button>
           <button id="log-tab-stocks" class="tab-button">STOCKS</button>
+          <button id="log-tab-map" class="tab-button">MAP</button>
+          <button id="log-tab-world" class="tab-button">WORLD</button>
+          <button id="log-tab-realty" class="tab-button">REALTY</button>
         </div>
         <div class="era-log" id="log"></div>
       </section>
@@ -609,8 +1326,18 @@ app.innerHTML = `
           <h2>Stocks</h2>
           <ul>
             <li>Each stock has its own base price, drift, volatility, and sector.</li>
-            <li>Prices update every day from random movement, faction reputation, events, and player trade actions.</li>
+            <li>Prices update every day from random movement, faction reputation, territory economy, ownership influence, events, and player trade actions.</li>
+            <li>Owning 25% of a company gives market influence; 50% grants a board seat and stronger control.</li>
             <li>Use leverage carefully. Higher leverage lowers entry cost, but profit and loss are magnified when selling.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Events</h2>
+          <ul>
+            <li>Random events include trade treaties, scandals, commodity booms, and faction crises.</li>
+            <li>Neutral events offer choices that affect reputation, stock momentum, and faction relationships.</li>
+            <li>The right decision can shape the market and shift the balance of power across the exchange.</li>
           </ul>
         </section>
 
@@ -626,7 +1353,7 @@ app.innerHTML = `
 
         <section>
           <h2>Useful Commands</h2>
-          <p>Try: status, market, ledger, stocks, bargain, buy ore 1, sell ore 1, stock buy vega_credit 1, leverage 2, vendor vega-vanto, gift 100, travel sirius, end.</p>
+          <p>Try: status, market, ledger, stocks, property list, property inspect vega_arcology, property buy vega_arcology, bargain, buy ore 1, sell ore 1, stock buy vega_credit 1, leverage 2, takeover vega_credit, merge vega_credit sirius_ore, manipulate vega_credit pump, etf vega, vendor vega-vanto, gift 100, travel sirius, end.</p>
           <p>Natural offer example: I offer Nova 500 credits for 10 fuel as humanitarian support.</p>
         </section>
       </div>
@@ -650,6 +1377,9 @@ const tabBargainButton = document.querySelector<HTMLButtonElement>('#tab-bargain
 const logTabConversationButton = document.querySelector<HTMLButtonElement>('#log-tab-conversation')!;
 const logTabAccountButton = document.querySelector<HTMLButtonElement>('#log-tab-account')!;
 const logTabStocksButton = document.querySelector<HTMLButtonElement>('#log-tab-stocks')!;
+const logTabMapButton = document.querySelector<HTMLButtonElement>('#log-tab-map')!;
+const logTabWorldButton = document.querySelector<HTMLButtonElement>('#log-tab-world')!;
+const logTabRealtyButton = document.querySelector<HTMLButtonElement>('#log-tab-realty')!;
 const infoButton = document.querySelector<HTMLButtonElement>('#info-button')!;
 const infoCloseButton = document.querySelector<HTMLButtonElement>('#info-close')!;
 const infoScreenEl = document.querySelector<HTMLElement>('#info-screen')!;
@@ -682,6 +1412,21 @@ logTabAccountButton.addEventListener('click', () => {
 
 logTabStocksButton.addEventListener('click', () => {
   activeLogTab = 'stocks';
+  renderLogPanel();
+});
+
+logTabMapButton.addEventListener('click', () => {
+  activeLogTab = 'map';
+  renderLogPanel();
+});
+
+logTabWorldButton.addEventListener('click', () => {
+  activeLogTab = 'world';
+  renderLogPanel();
+});
+
+logTabRealtyButton.addEventListener('click', () => {
+  activeLogTab = 'realty';
   renderLogPanel();
 });
 
@@ -985,6 +1730,519 @@ function influenceBundleStocks(bundle: ResourceBundle, direction: 1 | -1): void 
   }
 }
 
+function propertyTypeLabel(type: RealEstatePropertyType): string {
+  if (type === 'colony_dome') return 'Colony Dome';
+  if (type === 'orbital_tower') return 'Orbital Tower';
+  if (type === 'ring_estate') return 'Ring Estate';
+  return 'Habitat Hub';
+}
+
+function propertyOwnerLabel(owner: PropertyOwner): string {
+  if (owner === 'player') return 'You';
+  if (owner === 'neutral') return 'Neutral';
+  return factionName(owner);
+}
+
+function starTypeRentModifier(type: StarType): number {
+  switch (type) {
+    case 'blue_white':
+      return 0.12;
+    case 'binary':
+      return 0.08;
+    case 'red_dwarf':
+      return -0.05;
+    case 'neutron':
+      return -0.12;
+  }
+}
+
+function starTypeLabel(type: StarType): string {
+  if (type === 'blue_white') return 'Blue-White';
+  if (type === 'binary') return 'Binary';
+  if (type === 'red_dwarf') return 'Red Dwarf';
+  return 'Neutron';
+}
+
+function planetTypeLabel(type: PlanetType): string {
+  if (type === 'habitable') return 'Habitable';
+  if (type === 'ice') return 'Ice';
+  if (type === 'gas_giant') return 'Gas Giant';
+  if (type === 'asteroid') return 'Asteroid';
+  return 'Ocean';
+}
+
+function starFuelYield(system: StarSystem): number {
+  const base = system.starType === 'blue_white' ? 4 : system.starType === 'binary' ? 4 : system.starType === 'red_dwarf' ? 3 : 2;
+  return Math.max(1, Math.round(base * (1 + system.regionBonus * 0.25)));
+}
+
+function planetResourceHarvest(planet: Planet): Record<SupplyId, number> {
+  const baseYields: Record<PlanetType, Record<SupplyId, number>> = {
+    habitable: { food: 1, water: 1, fuel: 3 },
+    ocean: { food: 1, water: 1, fuel: 2 },
+    ice: { food: 0, water: 1, fuel: 3 },
+    gas_giant: { food: 0, water: 0, fuel: 4 },
+    asteroid: { food: 0, water: 0, fuel: 4 },
+  };
+
+  const modifier = planet.hazard.includes('storm') ? 0 : planet.hazard.includes('radiation') ? -0.2 : planet.hazard.includes('micro-meteor') ? -0.1 : 0;
+  const yields = baseYields[planet.type];
+
+  return {
+    food: Math.max(0, Math.round(yields.food * (1 + modifier))),
+    water: Math.max(0, Math.round(yields.water * (1 + modifier))),
+    fuel: Math.max(0, Math.round(yields.fuel * (1 + modifier))),
+  };
+}
+
+function planetTypeDemandModifier(type: PlanetType): number {
+  switch (type) {
+    case 'habitable':
+      return 0.1;
+    case 'ocean':
+      return 0.08;
+    case 'asteroid':
+      return 0.02;
+    case 'ice':
+      return 0.04;
+    case 'gas_giant':
+      return -0.06;
+  }
+}
+
+function hazardRentModifier(hazard: string): number {
+  if (hazard.includes('radiation')) return -0.1;
+  if (hazard.includes('micro-meteor')) return -0.06;
+  if (hazard.includes('storm')) return -0.04;
+  return 0;
+}
+
+function hazardMaintenanceModifier(hazard: string): number {
+  if (hazard.includes('radiation')) return 0.22;
+  if (hazard.includes('micro-meteor')) return 0.16;
+  if (hazard.includes('storm')) return 0.12;
+  return 0;
+}
+
+function propertyQualityMultiplier(quality: PropertyQuality): number {
+  if (quality === 'high') return 1.12;
+  if (quality === 'low') return 0.92;
+  return 1;
+}
+
+function qualityMaintenanceModifier(quality: PropertyQuality): number {
+  if (quality === 'high') return -0.08;
+  if (quality === 'low') return 0.08;
+  return 0;
+}
+
+function propertyRelationshipModifier(property: RealEstateProperty): number {
+  const ownerFaction = starSystems[property.systemId].factionId;
+  const relationship = diplomacy[ownerFaction].relationship;
+  return Math.max(-0.08, Math.min(0.08, relationship / 1000));
+}
+
+function propertyEffectiveRent(property: RealEstateProperty): number {
+  const system = starSystems[property.systemId];
+  const planet = planets[property.planetId];
+  const modifiers =
+    starTypeRentModifier(system.starType) +
+    planetTypeDemandModifier(planet.type) +
+    hazardRentModifier(planet.hazard) +
+    propertyRelationshipModifier(property) +
+    propertyLeaseRentModifier(property);
+
+  return Math.max(1, Math.round(property.rent * propertyQualityMultiplier(property.quality) * (1 + modifiers)));
+}
+
+function propertyLeaseRentModifier(property: RealEstateProperty): number {
+  return property.isLeased ? 0.12 : 0;
+}
+
+function propertyEffectiveOccupancy(property: RealEstateProperty): number {
+  return Math.min(1, property.occupancy + (property.isLeased ? 0.18 : 0));
+}
+
+function propertyEffectiveMaintenance(property: RealEstateProperty): number {
+  const planet = planets[property.planetId];
+  const leaseMaintenance = property.isLeased ? 0.06 : 0;
+  const maintenanceMultiplier = 1 + hazardMaintenanceModifier(planet.hazard) + qualityMaintenanceModifier(property.quality) + leaseMaintenance;
+  return Math.max(1, Math.round(property.maintenance * maintenanceMultiplier));
+}
+
+function propertySummary(property: RealEstateProperty): string {
+  const leasedLabel = property.isLeased ? ' (leased)' : '';
+  return `${property.name}${leasedLabel} (${propertyTypeLabel(property.propertyType)}) — ${starSystems[property.systemId].name}, ${planets[property.planetId].name}. Price ${property.basePrice}, rent ${property.rent}/day, occupancy ${Math.round(property.occupancy * 100)}%, owner ${propertyOwnerLabel(property.owner)}.`;
+}
+
+function showPropertyList(): void {
+  const lines = propertyIds
+    .map((propertyId) => propertySummary(properties[propertyId]))
+    .join('\n');
+
+  log(`REAL ESTATE LIST\n${lines}`);
+}
+
+function inspectProperty(propertyId: string): void {
+  const property = properties[propertyId];
+
+  if (!property) {
+    log(`Property not found: ${propertyId}`);
+    return;
+  }
+
+  const system = starSystems[property.systemId];
+  const planet = planets[property.planetId];
+
+    const effectiveRent = propertyEffectiveRent(property);
+  const effectiveMaintenance = propertyEffectiveMaintenance(property);
+  const effectiveOccupancy = propertyEffectiveOccupancy(property);
+  const grossIncome = Math.round(effectiveRent * effectiveOccupancy);
+  const netIncome = grossIncome - effectiveMaintenance;
+
+  log(`PROPERTY DETAILS
+${property.name}
+System: ${system.name} (${system.starType})
+Planet: ${planet.name} (${planet.type})
+Type: ${propertyTypeLabel(property.propertyType)}
+Owner: ${propertyOwnerLabel(property.owner)}
+Price: ${property.basePrice}
+Base rent: ${property.rent}/day
+Effective rent: ${effectiveRent}/day
+Maintenance: ${property.maintenance}/day
+Effective maintenance: ${effectiveMaintenance}/day
+Occupancy: ${Math.round(property.occupancy * 100)}%
+Effective occupancy: ${Math.round(effectiveOccupancy * 100)}%
+Gross income: ${grossIncome}/day
+Net income: ${netIncome}/day
+Quality: ${property.quality}
+Leased: ${property.isLeased ? 'Yes' : 'No'}
+For Sale: ${property.isForSale ? 'Yes' : 'No'}
+Lease Allowed: ${property.leaseAllowed ? 'Yes' : 'No'}`);
+}
+
+function buyProperty(propertyId: string): void {
+  const property = properties[propertyId];
+
+  if (!property) {
+    log(`Property not found: ${propertyId}`);
+    return;
+  }
+
+  if (!property.isForSale) {
+    log(`${property.name} is not for sale right now.`);
+    return;
+  }
+
+  if (property.owner === 'player') {
+    log(`You already own ${property.name}.`);
+    return;
+  }
+
+  if (player.credits < property.basePrice) {
+    log(`Not enough credits to buy ${property.name}. Need ${property.basePrice}.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  player.credits -= property.basePrice;
+  property.owner = 'player';
+  property.isForSale = false;
+
+  log(`You bought ${property.name} for ${property.basePrice} credits.`);
+  accountLog(`PROPERTY BUY | ${property.name}. Credits ${beforeCredits} -> ${player.credits}.`);
+}
+
+function sellProperty(propertyId: string): void {
+  const property = properties[propertyId];
+
+  if (!property) {
+    log(`Property not found: ${propertyId}`);
+    return;
+  }
+
+  if (property.owner !== 'player') {
+    log(`You do not own ${property.name}.`);
+    return;
+  }
+
+  const salePrice = Math.max(1, Math.round(property.basePrice * 0.8));
+  const beforeCredits = player.credits;
+  player.credits += salePrice;
+  property.owner = 'neutral';
+  property.isForSale = true;
+
+  log(`You sold ${property.name} for ${salePrice} credits.`);
+  accountLog(`PROPERTY SELL | ${property.name}. Credits ${beforeCredits} -> ${player.credits}.`);
+}
+
+function upgradeProperty(propertyId: string): void {
+  const property = properties[propertyId];
+
+  if (!property) {
+    log(`Property not found: ${propertyId}`);
+    return;
+  }
+
+  if (property.owner !== 'player') {
+    log(`You do not own ${property.name}.`);
+    return;
+  }
+
+  if (property.quality === 'high') {
+    log(`${property.name} is already top-tier and cannot be upgraded further.`);
+    return;
+  }
+
+  const nextQuality = property.quality === 'low' ? 'medium' : 'high';
+  const upgradeCost = Math.round(property.basePrice * (property.quality === 'low' ? 0.3 : 0.4));
+
+  if (player.credits < upgradeCost) {
+    log(`Not enough credits to upgrade ${property.name}. Need ${upgradeCost}.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  player.credits -= upgradeCost;
+  property.quality = nextQuality;
+  property.occupancy = Math.min(1, property.occupancy + 0.12);
+  property.rent = Math.max(1, Math.round(property.rent * 1.12));
+  property.maintenance = Math.max(1, Math.round(property.maintenance * 0.94));
+
+  log(`You upgraded ${property.name} to ${nextQuality} quality for ${upgradeCost} credits.`);
+  accountLog(`PROPERTY UPGRADE | ${property.name}. Credits ${beforeCredits} -> ${player.credits}.`);
+}
+
+function leaseProperty(propertyId: string): void {
+  const property = properties[propertyId];
+
+  if (!property) {
+    log(`Property not found: ${propertyId}`);
+    return;
+  }
+
+  if (property.owner !== 'player') {
+    log(`You do not own ${property.name}.`);
+    return;
+  }
+
+  if (!property.leaseAllowed) {
+    log(`${property.name} cannot be leased at this time.`);
+    return;
+  }
+
+  if (property.isLeased) {
+    log(`${property.name} is already leased.`);
+    return;
+  }
+
+  property.isLeased = true;
+  log(`You secured a lease agreement for ${property.name}, boosting rental occupancy and yield.`);
+}
+
+function releaseProperty(propertyId: string): void {
+  const property = properties[propertyId];
+
+  if (!property) {
+    log(`Property not found: ${propertyId}`);
+    return;
+  }
+
+  if (property.owner !== 'player') {
+    log(`You do not own ${property.name}.`);
+    return;
+  }
+
+  if (!property.isLeased) {
+    log(`${property.name} is not currently leased.`);
+    return;
+  }
+
+  property.isLeased = false;
+  log(`You released the lease agreement for ${property.name}.`);
+}
+
+function inspectStarSystem(systemId: string): void {
+  const system = starSystems[systemId as StarSystemId];
+
+  if (!system) {
+    log(`Star system not found: ${systemId}`);
+    return;
+  }
+
+  const planetsInSystem = system.planetIds.map((planetId) => planets[planetId].name).join(', ');
+  const fuelYield = starFuelYield(system);
+  const claimCost = 12000 + fuelYield * 1200;
+  const harvested = starHarvests[system.id] === player.day ? 'Harvested today' : 'Ready to farm';
+
+  log(`STAR SYSTEM DETAILS
+${system.name}
+Star type: ${starTypeLabel(system.starType)}
+Controlled by: ${factionName(system.factionId)}
+Owner: ${propertyOwnerLabel(system.owner)}
+Region bonus: ${Math.round(system.regionBonus * 100)}%
+Planets: ${planetsInSystem}
+Claim cost: ${claimCost} credits
+Fuel farming: ${fuelYield} fuel when harvested
+Status: ${harvested}`);
+}
+
+function inspectPlanet(planetId: string): void {
+  const planet = planets[planetId as PlanetId];
+
+  if (!planet) {
+    log(`Planet not found: ${planetId}`);
+    return;
+  }
+
+  const system = starSystems[planet.systemId];
+  const harvest = planetResourceHarvest(planet);
+  const demandList = Object.entries(planet.resourceDemand)
+    .map(([resource, value]) => `${resource}: ${Math.round(value * 100)}%`)
+    .join(', ');
+  const claimCost = 5200 + harvest.food * 380 + harvest.water * 320 + harvest.fuel * 260;
+  const harvested = planetHarvests[planet.id] === player.day ? 'Harvested today' : 'Ready to farm';
+
+  log(`PLANET DETAILS
+${planet.name}
+System: ${system.name}
+Owner: ${propertyOwnerLabel(planet.owner)}
+Type: ${planetTypeLabel(planet.type)}
+Hazard: ${planet.hazard}
+Resource demand: ${demandList}
+Claim cost: ${claimCost} credits
+Food farming: ${harvest.food}
+Water farming: ${harvest.water}
+Fuel farming: ${harvest.fuel}
+Status: ${harvested}`);
+}
+
+function claimStarSystem(systemId: string): void {
+  const system = starSystems[systemId as StarSystemId];
+
+  if (!system) {
+    log(`Star system not found: ${systemId}`);
+    return;
+  }
+
+  if (system.owner === 'player') {
+    log(`You already own ${system.name}.`);
+    return;
+  }
+
+  const cost = 12000 + starFuelYield(system) * 1200;
+
+  if (player.credits < cost) {
+    log(`Not enough credits to claim ${system.name}. Need ${cost}.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  player.credits -= cost;
+  system.owner = 'player';
+
+  log(`You claimed ${system.name} for ${cost} credits.`);
+  accountLog(`STAR CLAIM | ${system.name}. Credits ${beforeCredits} -> ${player.credits}.`);
+}
+
+function claimPlanet(planetId: string): void {
+  const planet = planets[planetId as PlanetId];
+
+  if (!planet) {
+    log(`Planet not found: ${planetId}`);
+    return;
+  }
+
+  if (planet.owner === 'player') {
+    log(`You already own ${planet.name}.`);
+    return;
+  }
+
+  const harvest = planetResourceHarvest(planet);
+  const cost = 5200 + harvest.food * 380 + harvest.water * 320 + harvest.fuel * 260;
+
+  if (player.credits < cost) {
+    log(`Not enough credits to claim ${planet.name}. Need ${cost}.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  player.credits -= cost;
+  planet.owner = 'player';
+
+  log(`You claimed ${planet.name} for ${cost} credits.`);
+  accountLog(`PLANET CLAIM | ${planet.name}. Credits ${beforeCredits} -> ${player.credits}.`);
+}
+
+function farmStarResources(systemId: string): void {
+  const system = starSystems[systemId as StarSystemId];
+
+  if (!system) {
+    log(`Star system not found: ${systemId}`);
+    return;
+  }
+
+  if (activeLogTab !== 'map') {
+    log('You must be in the MAP view to harvest stars.');
+    return;
+  }
+
+  if (system.owner !== 'player') {
+    log(`You must own ${system.name} before harvesting its fuel reserves.`);
+    return;
+  }
+
+  if (starHarvests[system.id] === player.day) {
+    log(`${system.name} has already been harvested today. Come back tomorrow.`);
+    return;
+  }
+
+  const fuelYield = starFuelYield(system);
+  starHarvests[system.id] = player.day;
+  gainSupply('fuel', fuelYield);
+  log(`Fuel harvested from ${system.name}: +${fuelYield} fuel.`);
+  accountLog(`STAR FARM | ${system.name}. Fuel +${fuelYield}.`);
+}
+
+function farmPlanetResources(planetId: string): void {
+  const planet = planets[planetId as PlanetId];
+
+  if (!planet) {
+    log(`Planet not found: ${planetId}`);
+    return;
+  }
+
+  const system = starSystems[planet.systemId];
+
+  if (activeLogTab !== 'map') {
+    log('You must be in the MAP view to farm planets.');
+    return;
+  }
+
+  if (planet.owner !== 'player') {
+    log(`You must own ${planet.name} before farming its resources.`);
+    return;
+  }
+
+  if (system.owner !== 'player') {
+    log(`You must also own ${system.name} before farming ${planet.name}.`);
+    return;
+  }
+
+  if (planetHarvests[planet.id] === player.day) {
+    log(`${planet.name} has already been farmed today. Come back tomorrow.`);
+    return;
+  }
+
+  const harvest = planetResourceHarvest(planet);
+  planetHarvests[planet.id] = player.day;
+  gainSupply('food', harvest.food);
+  gainSupply('water', harvest.water);
+  gainSupply('fuel', harvest.fuel);
+  log(`Farming on ${planet.name}: +${harvest.food} food, +${harvest.water} water, +${harvest.fuel} fuel.`);
+  accountLog(`PLANET FARM | ${planet.name}. Food +${harvest.food}, Water +${harvest.water}, Fuel +${harvest.fuel}.`);
+}
+
 function stockPortfolioValue(): number {
   return stockIds.reduce((total, stockId) => total + stockPositionValue(stockId), 0);
 }
@@ -1030,8 +2288,22 @@ function applyStockMarketTurn(): void {
     const before = stock.price;
     const randomMove = (Math.random() * 2 - 1) * stock.volatility;
     const relationshipSupport = stockRelationshipSupport(stockId);
+    const territorySupport = territoryStockSupport(stockId);
+    const ownershipSupportValue = ownershipSupport(stockId);
+    const takeoverSupport = hostileTakeoverSupport(stockId);
+    const mergerSupport = mergedSupport(stockId);
+    const etfSupport = allianceETFSupport(stockId);
     const bias = stockMarketBias[stockId];
-    const rawPercent = stock.drift + randomMove + relationshipSupport + bias;
+    const rawPercent =
+      stock.drift +
+      randomMove +
+      relationshipSupport +
+      territorySupport +
+      ownershipSupportValue +
+      takeoverSupport +
+      mergerSupport +
+      etfSupport +
+      bias;
     const clampedPercent = Math.max(-0.075, Math.min(0.075, rawPercent));
 
     stock.price = Math.max(4, Math.round(stock.price * (1 + clampedPercent)));
@@ -1046,6 +2318,306 @@ function applyStockMarketTurn(): void {
   }
 
   accountLog(`STOCK MARKET | ${changes.join('; ')}.`);
+}
+
+function renderRealtyPanel(): void {
+  const ownedProperties = propertyIds
+    .map((propertyId) => properties[propertyId])
+    .filter((property) => property.owner === 'player');
+
+  const availableProperties = propertyIds
+    .map((propertyId) => properties[propertyId])
+    .filter((property) => property.isForSale && property.owner !== 'player');
+
+  const ownedContent = ownedProperties.length
+    ? ownedProperties
+        .map((property) => {
+          const effectiveRent = propertyEffectiveRent(property);
+          const effectiveOccupancy = propertyEffectiveOccupancy(property);
+          const effectiveMaintenance = propertyEffectiveMaintenance(property);
+          const netIncome = propertyNetIncome(property);
+          const leasedBadge = property.isLeased ? '<span class="property-badge leased">LEASED</span>' : '';
+          const qualityBadge = `<span class="property-badge quality-${property.quality}">${property.quality.toUpperCase()}</span>`;
+
+          return `
+            <div class="log-entry property-card">
+              <div class="property-head"><strong>${property.name}</strong>${leasedBadge}${qualityBadge}</div>
+              <div class="property-line">Type: ${propertyTypeLabel(property.propertyType)}, Location: ${starSystems[property.systemId].name}</div>
+              <div class="property-line">Rent: ${effectiveRent}/day, Occupancy: ${Math.round(effectiveOccupancy * 100)}%, Maintenance: ${effectiveMaintenance}/day, Net: ${netIncome}/day</div>
+              <div class="property-actions">
+                <button class="property-action-button" data-command="property inspect ${property.id}">Inspect</button>
+                <button class="property-action-button" data-command="property upgrade ${property.id}">Upgrade</button>
+                <button class="property-action-button" data-command="property lease ${property.id}">Lease</button>
+                <button class="property-action-button" data-command="property release ${property.id}">Release</button>
+                <button class="property-action-button sell" data-command="property sell ${property.id}">Sell</button>
+              </div>
+            </div>`;
+        })
+        .join('')
+    : '<div class="log-entry">No properties owned yet.</div>';
+
+  const availableContent = availableProperties.length
+    ? availableProperties
+        .map((property) => {
+          const leaseHint = property.leaseAllowed ? '<span class="property-badge lease-allowed">LEASE OK</span>' : '';
+          return `
+            <div class="log-entry property-card">
+              <div class="property-head"><strong>${property.name}</strong>${leaseHint}</div>
+              <div class="property-line">Price: ${property.basePrice} credits, Base rent: ${property.rent}/day, Owner: ${propertyOwnerLabel(property.owner)}</div>
+              <div class="property-line">Quality: ${property.quality}, Occupancy: ${Math.round(property.occupancy * 100)}%</div>
+              <div class="property-actions">
+                <button class="property-action-button" data-command="property inspect ${property.id}">Inspect</button>
+                <button class="property-action-button" data-command="property buy ${property.id}">Buy</button>
+              </div>
+            </div>`;
+        })
+        .join('')
+    : '<div class="log-entry">No properties are currently for sale.</div>';
+
+  const propertyNet = propertyIncomePerTurn();
+  const propertyCount = ownedProperties.length;
+
+  logEl.innerHTML = `
+    <div class="log-entry realty-summary">
+      <strong>REALTY SUMMARY</strong><br/>Owned: ${propertyCount} properties<br/>Net income: ${propertyNet}/day
+    </div>
+    <div class="log-entry realty-help">Use property commands to manage your estate and the WORLD tab to claim stars and planets.</div>
+    <div class="log-entry"><strong>OWNED PROPERTIES</strong></div>
+    ${ownedContent}
+    <div class="log-entry"><strong>FOR SALE</strong></div>
+    ${availableContent}
+  `;
+
+  logEl.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+      executeCommand(button.dataset.command ?? '');
+    });
+  });
+
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderWorldPanel(): void {
+  const worldContent = Object.values(starSystems)
+    .map((system) => {
+      const fuelYield = starFuelYield(system);
+      const starStatus = starHarvests[system.id] === player.day ? 'Harvested today' : 'Ready to farm';
+      const starClaimCost = 12000 + fuelYield * 1200;
+      const isExpanded = expandedSystems[system.id] ?? false;
+      const planetRows = isExpanded
+        ? system.planetIds
+            .map((planetId) => {
+              const planet = planets[planetId];
+              const harvest = planetResourceHarvest(planet);
+              const status = planetHarvests[planet.id] === player.day ? 'Harvested today' : 'Ready to farm';
+              const claimCost = 5200 + harvest.food * 380 + harvest.water * 320 + harvest.fuel * 260;
+
+              return `
+                <div class="log-entry planet-card nested-card">
+                  <div class="property-head"><strong>${planet.name}</strong><span class="property-badge">${planetTypeLabel(planet.type)}</span></div>
+                  <div class="property-line">Hazard: ${planet.hazard}, Owner: ${propertyOwnerLabel(planet.owner)}</div>
+                  <div class="property-line">Resource demand: ${Object.entries(planet.resourceDemand)
+                    .map(([resource, value]) => `${resource}: ${Math.round(value * 100)}%`)
+                    .join(', ')}</div>
+                  <div class="property-line">Claim cost: ${claimCost} credits</div>
+                  <div class="property-line">Farming yield: ${harvest.food} food, ${harvest.water} water, ${harvest.fuel} fuel — ${status}</div>
+                  <div class="property-actions">
+                    <button class="property-action-button" data-command="planet inspect ${planet.id}">Inspect</button>
+                    ${planet.owner !== 'player' ? `<button class="property-action-button" data-command="planet claim ${planet.id}">Claim</button>` : ''}
+                    <button class="property-action-button farm-button" data-command="planet farm ${planet.id}">Farm</button>
+                    ${player.locationId === starSystemToLocation[planet.systemId] ? `<button class="property-action-button" data-command="planet navigate ${planet.id}">Navigate</button>` : ''}
+                  </div>
+                </div>`;
+            })
+            .join('')
+        : '';
+      const toggleLabel = isExpanded ? 'Hide planets' : 'Show planets';
+
+      return `
+        <div class="log-entry star-card">
+          <div class="property-head"><strong>${system.name}</strong><span class="property-badge">${starTypeLabel(system.starType)}</span></div>
+          <div class="property-line">Controlled by: ${factionName(system.factionId)}, Owner: ${propertyOwnerLabel(system.owner)}</div>
+          <div class="property-line">Claim cost: ${starClaimCost} credits</div>
+          <div class="property-line">Fuel farming: ${fuelYield} fuel per harvest — ${starStatus}</div>
+          <div class="property-actions">
+            <button class="property-action-button" data-command="world toggle ${system.id}">${toggleLabel}</button>
+            <button class="property-action-button" data-command="star inspect ${system.id}">Inspect</button>
+            ${system.owner !== 'player' ? `<button class="property-action-button" data-command="star claim ${system.id}">Claim</button>` : ''}
+            <button class="property-action-button farm-button" data-command="star farm ${system.id}">Farm</button>
+          </div>
+          ${planetRows}
+        </div>`;
+    })
+    .join('');
+
+  logEl.innerHTML = `
+    <div class="log-entry realty-summary">
+      <strong>STAR SYSTEM GRID</strong><br/>Browse systems and their planetary bodies.
+    </div>
+    <div class="log-entry realty-help">Claim a system or one of its planets before you harvest.</div>
+    ${worldContent}
+  `;
+
+  logEl.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+      executeCommand(button.dataset.command ?? '');
+    });
+  });
+
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderMapPanel(): void {
+  if (selectedMapSystem) {
+    renderMapSystemPanel(selectedMapSystem);
+    return;
+  }
+
+  const shipSystemId = locationToStarSystem[player.locationId];
+  const shipStar = galaxyStars.find((star) => star.systemId === shipSystemId);
+
+  const starNodes = galaxyStars
+    .map((star) => {
+      const starSystem = star.systemId ? starSystems[star.systemId] : undefined;
+      const owned = starSystem?.owner === 'player';
+      const starClass = owned ? 'galaxy-star owned' : 'galaxy-star';
+      const labelClass = owned ? 'galaxy-label owned' : 'galaxy-label';
+      const clickHint = star.systemId ? `data-command="map zoom ${star.systemId}"` : '';
+
+      return `
+        <g class="galaxy-star-node" ${clickHint}>
+          <circle cx="${star.x}" cy="${star.y}" r="11" class="${starClass}" />
+          <text x="${star.x + 16}" y="${star.y + 6}" class="${labelClass}">${escapeHtml(star.name)}</text>
+        </g>`;
+    })
+    .join('');
+
+  const shipOverlay = shipStar
+    ? `<text x="${shipStar.x - 8}" y="${shipStar.y + 5}" class="spaceship-icon">🚀</text>`
+    : '';
+
+  logEl.innerHTML = `
+    <div class="log-entry realty-summary">
+      <strong>STAR MAP</strong><br/>Explore nearby systems and locate your ship.
+    </div>
+    <div class="log-entry realty-help">Click a star to zoom into that system or navigate there. Trade availability varies by location.</div>
+    <div class="log-entry galaxy-map-card">
+      <div class="galaxy-map">
+        <svg viewBox="0 0 800 360" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="galaxyGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#3df1ff" stop-opacity="0.28" />
+              <stop offset="100%" stop-color="#020b16" stop-opacity="0" />
+            </radialGradient>
+          </defs>
+          <rect x="0" y="0" width="800" height="360" class="galaxy-background" />
+          <g class="galaxy-nebula">
+            <circle cx="180" cy="90" r="45" />
+            <circle cx="540" cy="200" r="60" />
+            <circle cx="420" cy="70" r="35" />
+          </g>
+          ${starNodes}
+          ${shipOverlay}
+        </svg>
+      </div>
+    </div>
+    <div class="log-entry galaxy-legend">
+      <span class="legend owned">Owned system</span>
+      <span class="legend">Click a star to zoom</span>
+    </div>
+  `;
+
+  logEl.querySelectorAll<HTMLElement>('.galaxy-star-node').forEach((node) => {
+    const command = node.getAttribute('data-command');
+    node.style.cursor = 'pointer';
+    node.addEventListener('click', () => {
+      if (command) {
+        executeCommand(command);
+      }
+    });
+  });
+
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderMapSystemPanel(systemId: StarSystemId): void {
+  const system = starSystems[systemId];
+  const currentSystemId = locationToStarSystem[player.locationId];
+  const systemName = escapeHtml(system.name);
+  const planetPositions = systemPlanetPositions[systemId];
+  const planetNodes = system.planetIds
+    .map((planetId, index) => {
+      const planet = planets[planetId];
+      const pos = planetPositions[index];
+      const ownTag = planet.owner === 'player' ? 'owned' : '';
+      return `
+        <g>
+          <circle cx="${pos.x}" cy="${pos.y}" r="8" class="galaxy-planet ${ownTag}" />
+          <text x="${pos.labelX}" y="${pos.labelY}" class="galaxy-label galaxy-planet-label">${escapeHtml(planet.name)}</text>
+        </g>`;
+    })
+    .join('');
+
+  const star = galaxyStars.find((starItem) => starItem.systemId === systemId);
+  const starSvg = star
+    ? `<circle cx="220" cy="180" r="18" class="galaxy-system-star" /><text x="240" y="184" class="galaxy-label galaxy-system-label">${escapeHtml(star.name)}</text>`
+    : '';
+
+  const canNavigate = currentSystemId !== systemId;
+  const navigateButton = canNavigate
+    ? `<button class="galaxy-action-button" data-command="map navigate ${systemId}">Navigate to ${system.name} (5 fuel)</button>`
+    : '';
+  const systemTradeHint = currentSystemId === systemId
+    ? 'Local market and activity are active here.'
+    : 'Trade and contracts only update once you arrive in this system.';
+
+  const planetCards = system.planetIds
+    .map((planetId) => {
+      const planet = planets[planetId];
+      const dataCommand = `planet inspect ${planetId}`;
+      const claimButton = planet.owner !== 'player' ? `<button class="galaxy-action-button" data-command="planet claim ${planetId}">Claim</button>` : '';
+      const farmButton = `<button class="galaxy-action-button" data-command="planet farm ${planetId}">Farm</button>`;
+      return `
+        <div class="galaxy-planet-card">
+          <strong>${escapeHtml(planet.name)}</strong> <span class="galaxy-badge">${planetTypeLabel(planet.type)}</span><br/>
+          Hazard: ${escapeHtml(planet.hazard)}<br/>
+          Owner: ${propertyOwnerLabel(planet.owner)}<br/>
+          ${claimButton}${farmButton}
+          <button class="galaxy-action-button" data-command="${dataCommand}">Inspect</button>
+        </div>`;
+    })
+    .join('');
+
+  logEl.innerHTML = `
+    <div class="log-entry realty-summary">
+      <strong>SYSTEM VIEW: ${systemName}</strong><br/>${systemTradeHint}
+    </div>
+    <div class="log-entry realty-help">Use zoom to inspect planets, then navigate to trade or farm within the system.</div>
+    <div class="log-entry galaxy-system-card">
+      <div class="galaxy-map galaxy-map-system">
+        <svg viewBox="0 0 480 360" preserveAspectRatio="xMidYMid meet">
+          <rect x="0" y="0" width="480" height="360" class="galaxy-background" />
+          ${starSvg}
+          ${planetNodes}
+        </svg>
+      </div>
+    </div>
+    <div class="log-entry galaxy-actions">
+      <button class="galaxy-action-button" data-command="map back">Back to Map</button>
+      ${navigateButton}
+    </div>
+    <div class="log-entry galaxy-planet-grid">
+      ${planetCards}
+    </div>
+  `;
+
+  logEl.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+      executeCommand(button.dataset.command ?? '');
+    });
+  });
+
+  logEl.scrollTop = logEl.scrollHeight;
 }
 
 function buyStock(stockIdText: string, amountText: string): void {
@@ -1132,6 +2704,146 @@ function setStockLeverage(valueText: string): void {
   log(`Stock leverage set to ${stockLeverage}x. Higher leverage lowers entry cost but magnifies losses on sale.`);
 }
 
+function attemptHostileTakeover(stockIdText: string): void {
+  const stockId = stockIdText as StockId;
+  const stock = stocks[stockId];
+  const position = stockPositions[stockId];
+
+  if (!stock || !position) {
+    log('Invalid takeover target or no holdings. Example: takeover vega_credit');
+    return;
+  }
+
+  const ownership = playerOwnershipPercent(stockId);
+  if (ownership < 40) {
+    log('You need at least 40% ownership to attempt a hostile takeover.');
+    return;
+  }
+
+  if (hostileTakeovers[stockId]) {
+    log('A hostile takeover has already been executed for this company.');
+    return;
+  }
+
+  const cost = Math.ceil(stock.price * 8);
+  if (player.credits < cost) {
+    log(`Not enough credits. Need ${cost} to launch the takeover bid.`);
+    return;
+  }
+
+  player.credits -= cost;
+  hostileTakeovers[stockId] = true;
+  stockMarketBias[stockId] += 0.04;
+  const faction = stockFaction(stockId);
+  adjustRelationship(faction, -18);
+  influenceStock(stockId, 0.01);
+  log(`Hostile takeover launched against ${stock.symbol}. Credits -${cost}. Relationship with ${factionName(faction)} falls.`);
+  accountLog(`TAKEOVER | ${stock.symbol}. Credits ${player.credits + cost} -> ${player.credits}.`);
+}
+
+function attemptStockMerge(stockAIdText: string, stockBIdText: string): void {
+  const stockAId = stockAIdText as StockId;
+  const stockBId = stockBIdText as StockId;
+
+  if (!stocks[stockAId] || !stocks[stockBId] || stockAId === stockBId) {
+    log('Invalid merge command. Example: merge vega_credit sirius_ore');
+    return;
+  }
+
+  const pair = [stockAId, stockBId].sort().join('|');
+  if (mergedStockPairs.has(pair)) {
+    log(`${stocks[stockAId].symbol} and ${stocks[stockBId].symbol} are already merged.`);
+    return;
+  }
+
+  if (playerOwnershipPercent(stockAId) < 50 || playerOwnershipPercent(stockBId) < 50) {
+    log('You need board seats (50% ownership) in both stocks to merge them.');
+    return;
+  }
+
+  const cost = 220;
+  if (player.credits < cost) {
+    log(`Not enough credits. Need ${cost} to fund the merger transaction.`);
+    return;
+  }
+
+  player.credits -= cost;
+  mergedStockPairs.add(pair);
+  stockMarketBias[stockAId] += 0.025;
+  stockMarketBias[stockBId] += 0.025;
+  influenceStock(stockAId, 0.01);
+  influenceStock(stockBId, 0.01);
+  log(`Merger approved between ${stocks[stockAId].symbol} and ${stocks[stockBId].symbol}. Credits -${cost}.`);
+  accountLog(`MERGER | ${stocks[stockAId].symbol} + ${stocks[stockBId].symbol}. Credits ${player.credits + cost} -> ${player.credits}.`);
+}
+
+function manipulateMarket(stockIdText: string, directionText: string): void {
+  const stockId = stockIdText as StockId;
+  const stock = stocks[stockId];
+
+  if (!stock || !['pump', 'dump'].includes(directionText)) {
+    log('Invalid manipulation command. Example: manipulate vega_credit pump');
+    return;
+  }
+
+  const cost = Math.ceil(stock.price * 2);
+  if (player.credits < cost) {
+    log(`Not enough credits. Need ${cost} to fund the market manipulation.`);
+    return;
+  }
+
+  player.credits -= cost;
+  const direction = directionText === 'pump' ? 1 : -1;
+  stockMarketBias[stockId] += direction * 0.03;
+  adjustRelationship(stockFaction(stockId), -6);
+  influenceStock(stockId, direction * 0.01);
+  log(`Market manipulation executed: ${directionText.toUpperCase()} ${stock.symbol}. Credits -${cost}. Relationship with ${factionName(stockFaction(stockId))} worsens.`);
+  accountLog(`MANIPULATION | ${directionText} ${stock.symbol}. Credits ${player.credits + cost} -> ${player.credits}.`);
+}
+
+function activateAllianceETF(factionText: string): void {
+  const aliasMap: Record<string, FactionId> = {
+    vega: 'vega_exchange',
+    sirius: 'sirius_guild',
+    nova: 'nova_relief',
+    caravans: 'free_caravans',
+    dust: 'dust_runners',
+    vega_exchange: 'vega_exchange',
+    sirius_guild: 'sirius_guild',
+    nova_relief: 'nova_relief',
+    free_caravans: 'free_caravans',
+    dust_runners: 'dust_runners',
+  };
+  const factionId = aliasMap[factionText];
+
+  if (!factionId) {
+    log('Invalid ETF command. Example: etf vega');
+    return;
+  }
+
+  if (allianceETFActive) {
+    log('An alliance ETF is already active.');
+    return;
+  }
+
+  const state = diplomacy[factionId];
+  if (state.alliance !== 'alliance') {
+    log(`You must have an alliance with ${factionName(factionId)} to create an ETF.`);
+    return;
+  }
+
+  const fee = 140;
+  if (player.credits < fee) {
+    log(`Not enough credits. Need ${fee} to launch the ETF.`);
+    return;
+  }
+
+  player.credits -= fee;
+  allianceETFActive = true;
+  log(`Alliance ETF launched for ${factionName(factionId)}. Allied stocks will feel broader market support.`);
+  accountLog(`ETF | ${factionName(factionId)}. Credits ${player.credits + fee} -> ${player.credits}.`);
+}
+
 function stockRelationshipSupport(stockId: StockId): number {
   const factionMap: Record<StockId, FactionId> = {
     vega_credit: 'vega_exchange',
@@ -1142,6 +2854,118 @@ function stockRelationshipSupport(stockId: StockId): number {
   };
   const relationship = diplomacy[factionMap[stockId]].relationship;
   return Math.max(-0.012, Math.min(0.012, relationship / 10000));
+}
+
+const territoryTypeStockMap: Record<TerritoryType, StockId> = {
+  mining: 'sirius_ore',
+  logistics: 'vega_credit',
+  water: 'nova_life',
+};
+
+function playerOwnershipPercent(stockId: StockId): number {
+  const position = stockPositions[stockId];
+  if (!position) return 0;
+  const total = stockTotalShares[stockId] || 1;
+  return (position.shares / total) * 100;
+}
+
+function stockOwnershipStatus(stockId: StockId): string {
+  const percent = playerOwnershipPercent(stockId);
+
+  if (percent >= 50) {
+    return 'Board Seat';
+  }
+
+  if (percent >= 25) {
+    return 'Influence';
+  }
+
+  return 'Minor';
+}
+
+function ownershipSupport(stockId: StockId): number {
+  const percent = playerOwnershipPercent(stockId);
+
+  if (percent >= 50) {
+    return 0.015;
+  }
+
+  if (percent >= 25) {
+    return 0.0075;
+  }
+
+  return 0;
+}
+
+function stockForFaction(factionId: FactionId): StockId {
+  const stockMap: Record<FactionId, StockId> = {
+    vega_exchange: 'vega_credit',
+    sirius_guild: 'sirius_ore',
+    nova_relief: 'nova_life',
+    free_caravans: 'caravan_lux',
+    dust_runners: 'dust_salvage',
+  };
+  return stockMap[factionId];
+}
+
+function stockFaction(stockId: StockId): FactionId {
+  const factionMap: Record<StockId, FactionId> = {
+    vega_credit: 'vega_exchange',
+    sirius_ore: 'sirius_guild',
+    nova_life: 'nova_relief',
+    caravan_lux: 'free_caravans',
+    dust_salvage: 'dust_runners',
+  };
+  return factionMap[stockId];
+}
+
+function hostileTakeoverSupport(stockId: StockId): number {
+  return hostileTakeovers[stockId] ? 0.02 : 0;
+}
+
+function mergedSupport(stockId: StockId): number {
+  const pairPrefix = `${stockId}|`;
+  for (const pair of mergedStockPairs) {
+    if (pair.startsWith(pairPrefix) || pair.endsWith(`|${stockId}`)) {
+      return 0.01;
+    }
+  }
+  return 0;
+}
+
+function allianceETFSupport(stockId: StockId): number {
+  if (!allianceETFActive) {
+    return 0;
+  }
+
+  const faction = stockFaction(stockId);
+  return diplomacy[faction].alliance === 'alliance' ? 0.018 : 0.006;
+}
+
+
+const territoryOwnerStockMap: Record<TerritoryOwner, StockId> = {
+  vega_union: 'vega_credit',
+  eclipse_combine: 'sirius_ore',
+  nova_frontier: 'nova_life',
+};
+
+function territoryStockSupport(stockId: StockId): number {
+  let support = 0;
+
+  for (const territory of Object.values(territories) as Territory[]) {
+    const typeStock = territoryTypeStockMap[territory.type];
+    const ownerStock = territoryOwnerStockMap[territory.owner];
+
+    if (stockId !== typeStock && stockId !== ownerStock) {
+      continue;
+    }
+
+    const outputValue = Object.values(territory.resourceOutput).reduce((sum, amount) => sum + amount, 0);
+    const territoryStrength = outputValue + territory.strategicValue * 0.5;
+    support += Math.min(0.012, territoryStrength * 0.00022);
+  }
+
+  return Math.max(0, Math.min(0.016, support));
 }
 
 function formatSignedPercent(value: number): string {
@@ -1156,8 +2980,28 @@ function specialBadge(vendorId: string, itemId: TradeItemId): string {
   return activeSpecial.type === 'discount' ? 'FLASH SALE' : 'HIGH DEMAND';
 }
 
+function propertyGrossIncome(property: RealEstateProperty): number {
+  return Math.round(propertyEffectiveRent(property) * propertyEffectiveOccupancy(property));
+}
+
+function propertyNetIncome(property: RealEstateProperty): number {
+  return propertyGrossIncome(property) - propertyEffectiveMaintenance(property);
+}
+
+function propertyIncomePerTurn(): number {
+  return propertyIds.reduce((sum, propertyId) => {
+    const property = properties[propertyId];
+    return property.owner === 'player' ? sum + propertyNetIncome(property) : sum;
+  }, 0);
+}
+
 function incomePerTurn(): number {
-  return 120 + countAlliances('trade_pact') * 25 + countAlliances('alliance') * 60;
+  return (
+    120 +
+    countAlliances('trade_pact') * 25 +
+    countAlliances('alliance') * 60 +
+    propertyIncomePerTurn()
+  );
 }
 
 function loseCredits(amount: number): number {
@@ -1356,6 +3200,162 @@ function createRefugeeCorridorEvent(): PendingEvent {
   };
 }
 
+function createTradeTreatyEvent(): PendingEvent {
+  const [first, second] = randomFactionPair();
+
+  return {
+    title: 'ECONOMIC EVENT - TRADE TREATY',
+    description: `${factionName(first)} and ${factionName(second)} are negotiating a new trade treaty across the exchange. You can broker the terms and shape which corridors gain the biggest boost.`,
+    options: [
+      {
+        command: `broker ${first}`,
+        label: `Broker for ${factionName(first)}`,
+        effect: () => {
+          if (player.credits < 80) {
+            log('You lack the credits to cover the treaty brokerage fee.');
+            return;
+          }
+          player.credits -= 80;
+          adjustRelationship(first, 14);
+          adjustRelationship(second, -8);
+          influenceFactionStocks(first, 0.02);
+          influenceFactionStocks(second, 0.01);
+          log(
+            `You broker the treaty in favor of ${factionName(first)}.\nThey reward you with improved terms and a stronger foothold in their market.`
+          );
+        },
+      },
+      {
+        command: `broker ${second}`,
+        label: `Broker for ${factionName(second)}`,
+        effect: () => {
+          if (player.credits < 80) {
+            log('You lack the credits to cover the treaty brokerage fee.');
+            return;
+          }
+          player.credits -= 80;
+          adjustRelationship(second, 14);
+          adjustRelationship(first, -8);
+          influenceFactionStocks(second, 0.02);
+          influenceFactionStocks(first, 0.01);
+          log(
+            `You broker the treaty in favor of ${factionName(second)}.\nThey reward you with improved terms and a stronger foothold in their market.`
+          );
+        },
+      },
+      {
+        command: 'broker none',
+        label: 'Stay Neutral',
+        effect: () => {
+          adjustRelationship(first, 3);
+          adjustRelationship(second, 3);
+          influenceStock('vega_credit', 0.008);
+          log(
+            `You stay neutral and allow both sides to negotiate freely.\nThe treaty passes with fewer strings attached, and the exchange feels steadier.`
+          );
+        },
+      },
+    ],
+  };
+}
+
+function createScandalEvent(): PendingEvent {
+  const factionId = randomFaction();
+  const stockId = stockForFaction(factionId);
+
+  return {
+    title: 'ECONOMIC EVENT - SCANDAL',
+    description: `${factionName(factionId)} is hit by a corporate scandal on the exchange. You can choose to expose it, cover it, or quietly step back.`,
+    options: [
+      {
+        command: `expose ${factionId}`,
+        label: `Expose ${factionName(factionId)}`,
+        effect: () => {
+          player.credits += 120;
+          adjustRelationship(factionId, -14);
+          influenceStock(stockId, -0.028);
+          influenceFactionStocks(factionId, -0.02);
+          log(
+            `You expose the scandal and earn a payout from investigative sources.\n${factionName(factionId)}'s reputation and stock suffer.`
+          );
+        },
+      },
+      {
+        command: `cover ${factionId}`,
+        label: `Cover for ${factionName(factionId)}`,
+        effect: () => {
+          if (player.credits < 100) {
+            log('You do not have enough credits to pay for the cover-up.');
+            return;
+          }
+          player.credits -= 100;
+          adjustRelationship(factionId, 18);
+          influenceStock(stockId, 0.02);
+          log(
+            `You quietly help bury the scandal with a 100-credit hush payment.\n${factionName(factionId)} rewards your discretion and their stock stabilizes.`
+          );
+        },
+      },
+      {
+        command: 'avoid scandal',
+        label: 'Avoid the Story',
+        effect: () => {
+          adjustRelationship(factionId, -4);
+          influenceStock(stockId, -0.01);
+          log(
+            `You avoid getting involved.\nThe scandal drips through the market anyway, leaving a smaller but unavoidable dent.`
+          );
+        },
+      },
+    ],
+  };
+}
+
+function createCommodityBoomEvent(): PendingEvent {
+  const goodId = randomPick(Object.keys(goods) as GoodId[]);
+  const stockId = stockForGood(goodId);
+
+  return {
+    title: 'ECONOMIC EVENT - COMMODITY BOOM',
+    description: `A sudden boom in ${goods[goodId].name} demand sweeps the exchange. You can choose to move supply now or ride the market longer.`,
+    options: [
+      {
+        command: `move ${goodId}`,
+        label: `Move ${goods[goodId].name} Now`,
+        effect: () => {
+          gainCargo(goodId, 1);
+          influenceStock(stockId, 0.018);
+          player.credits += 60;
+          log(
+            `You capitalize on the boom with a fast shipment.\nYour cargo and credits rise, and ${stocks[stockId].symbol} gets a fresh momentum boost.`
+          );
+        },
+      },
+      {
+        command: `hold ${goodId}`,
+        label: `Hold and Wait`,
+        effect: () => {
+          influenceStock(stockId, 0.026);
+          gainSupply('fuel', 3);
+          log(
+            `You let the boom build and preserve your position.\nThe market feels stronger, and your fuel reserves are spared for the next move.`
+          );
+        },
+      },
+      {
+        command: 'ignore boom',
+        label: 'Ignore the Boom',
+        effect: () => {
+          influenceStock(stockId, -0.01);
+          log(
+            `You ignore the commodity boom and stay out of the frenzy.\nPrices drift lower without your action.`
+          );
+        },
+      },
+    ],
+  };
+}
+
 function runGoodEvent(): void {
   const goodEvents = [
     () => {
@@ -1426,7 +3426,14 @@ function runBadEvent(): void {
 }
 
 function prepareNeutralEvent(): void {
-  const neutralEvents = [createBorderWarEvent, createTariffHearingEvent, createRefugeeCorridorEvent];
+  const neutralEvents = [
+    createBorderWarEvent,
+    createTariffHearingEvent,
+    createRefugeeCorridorEvent,
+    createTradeTreatyEvent,
+    createScandalEvent,
+    createCommodityBoomEvent,
+  ];
   pendingEvent = randomPick(neutralEvents)();
 
   log(
@@ -1520,9 +3527,27 @@ function renderLogPanel(): void {
   logTabConversationButton.className = activeLogTab === 'conversation' ? 'tab-button active-tab' : 'tab-button';
   logTabAccountButton.className = activeLogTab === 'account' ? 'tab-button active-tab' : 'tab-button';
   logTabStocksButton.className = activeLogTab === 'stocks' ? 'tab-button active-tab' : 'tab-button';
+  logTabMapButton.className = activeLogTab === 'map' ? 'tab-button active-tab' : 'tab-button';
+  logTabWorldButton.className = activeLogTab === 'world' ? 'tab-button active-tab' : 'tab-button';
+  logTabRealtyButton.className = activeLogTab === 'realty' ? 'tab-button active-tab' : 'tab-button';
 
   if (activeLogTab === 'stocks') {
     renderStockMarketPanel();
+    return;
+  }
+
+  if (activeLogTab === 'map') {
+    renderMapPanel();
+    return;
+  }
+
+  if (activeLogTab === 'world') {
+    renderWorldPanel();
+    return;
+  }
+
+  if (activeLogTab === 'realty') {
+    renderRealtyPanel();
     return;
   }
 
@@ -1568,7 +3593,7 @@ function renderStockMarketPanel(): void {
           <div class="stock-cell">
             <span class="stock-cell-label">Owned</span>
             <strong>${held}</strong>
-            <span>avg ${position ? position.averagePrice : '-'}</span>
+            <span>${playerOwnershipPercent(stockId).toFixed(0)}% ${stockOwnershipStatus(stockId)}</span>
           </div>
           <div class="stock-cell">
             <span class="stock-cell-label">Value</span>
@@ -1592,7 +3617,7 @@ function renderStockMarketPanel(): void {
       <div class="stock-market-head">
         <div>
           <div class="box-subtitle">STOCK MARKET</div>
-          <div class="ledger-copy">A compact exchange board for faction-linked equities. Prices move from market drift, volatility, reputation, events, travel, trade, and bargaining.</div>
+          <div class="ledger-copy">A compact exchange board for faction-linked equities. Prices move from market drift, volatility, reputation, territory economy, ownership, events, travel, trade, and bargaining.</div>
         </div>
         <div class="stock-summary">
           <div class="stat-row"><span>Credits</span><strong>${player.credits}</strong></div>
@@ -1681,6 +3706,7 @@ function renderStatus(): void {
   statusEl.innerHTML = `
     <div class="stat-row"><span>Credits</span><strong>${player.credits}</strong></div>
     <div class="stat-row"><span>Turn Income</span><strong>${incomePerTurn()}</strong></div>
+    <div class="stat-row"><span>Property Net</span><strong>${propertyIncomePerTurn()}</strong></div>
     <div class="stat-row"><span>Location</span><strong>${location.name}</strong></div>
     <div class="stat-row"><span>Vendor</span><strong>${vendor.name}</strong></div>
     <div class="stat-row"><span>Standing</span><strong>${factionState.relationship}</strong></div>
@@ -1920,6 +3946,7 @@ function renderCommands(): void {
     { label: 'View Ledger', command: 'tab ledger' },
     { label: 'Bargain AI', command: 'bargain' },
     { label: 'Stock Market', command: 'stocks' },
+    { label: 'Property List', command: 'property list' },
     { label: `Leverage ${stockLeverage === 3 ? 1 : stockLeverage + 1}x`, command: `leverage ${stockLeverage === 3 ? 1 : stockLeverage + 1}` },
   ];
 
@@ -2026,6 +4053,7 @@ function showStatus(): void {
     `STATUS
 Credits: ${player.credits}
 Turn income: ${incomePerTurn()}
+Property net income: ${propertyIncomePerTurn()}
 Location: ${location.name}
 Counterparty: ${vendor.name} (${factionName(vendor.factionId)})
 Relationship: ${state.relationship} (${relationshipTier(state.relationship)})
@@ -2540,20 +4568,26 @@ function resolvePendingEvent(command: string): boolean {
   return true;
 }
 
-function travel(destinationId: string): void {
+function travel(destinationId: string): boolean {
   const location = currentLocation();
   const destination = locations[destinationId as LocationId];
-  const fuelCost = location.routes[destinationId as LocationId];
   const beforeFuel = player.supplies.fuel;
 
-  if (!destination || fuelCost === undefined) {
+  if (!destination) {
     log('Unknown route.');
-    return;
+    return false;
   }
+
+  if (lastStarNavigationDay === player.day) {
+    log('You have already navigated between stars today. Wait until tomorrow.');
+    return false;
+  }
+
+  const fuelCost = 5;
 
   if (player.supplies.fuel < fuelCost) {
     log(`Not enough fuel. Need ${fuelCost} fuel.`);
-    return;
+    return false;
   }
 
   player.supplies.fuel -= fuelCost;
@@ -2563,14 +4597,43 @@ function travel(destinationId: string): void {
   influenceFactionStocks(destination.governingFaction, 0.006);
   influenceStock('sirius_ore', -0.004);
   accountLog(`TRAVEL | ${location.name} -> ${destination.name}. Fuel ${beforeFuel} -> ${player.supplies.fuel} (-${fuelCost}).`);
+  lastStarNavigationDay = player.day;
 
-  advanceTurn(
-    `You travel to ${destination.name}.\n${destination.description}\nPort authority: ${factionName(destination.governingFaction)}.`
-  );
+  log(`You travel to ${destination.name} (${fuelCost} fuel). ${destination.description} Port authority: ${factionName(destination.governingFaction)}.`);
+  return true;
+}
+
+function navigateToPlanet(planetId: string): void {
+  const planet = planets[planetId as PlanetId];
+
+  if (!planet) {
+    log(`Planet not found: ${planetId}`);
+    return;
+  }
+
+  const currentSystem = locationToStarSystem[player.locationId];
+  const destinationSystem = planet.systemId;
+
+  if (currentSystem !== destinationSystem) {
+    log(`You must be in ${starSystems[destinationSystem].name} before navigating to ${planet.name}.`);
+    return;
+  }
+
+  const fuelCost = 0;
+
+  if (player.supplies.fuel < fuelCost) {
+    log(`Not enough fuel for planetary navigation. Need ${fuelCost} fuel.`);
+    return;
+  }
+
+  const beforeFuel = player.supplies.fuel;
+  player.supplies.fuel -= fuelCost;
+  log(`You pilot to ${planet.name} within ${starSystems[destinationSystem].name}. Fuel ${beforeFuel} -> ${player.supplies.fuel} (-${fuelCost}).`);
+  accountLog(`PLANET NAVIGATE | ${planet.name}. Fuel ${beforeFuel} -> ${player.supplies.fuel} (-${fuelCost}).`);
 }
 
 function endTurn(): void {
-  advanceTurn(`You remain docked at ${currentLocation().name} and collect routine contract payouts.`);
+  advanceTurn(`You remain docked at ${currentLocation().name} and end your day.`);
 }
 
 function showLedger(): void {
@@ -2596,7 +4659,7 @@ function executeCommand(command: string): void {
     log(`> ${command}`);
   }
 
-  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'stocks', 'stock', 'leverage', 'tab'].includes(action)) {
+  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'stocks', 'stock', 'realty', 'leverage', 'tab', 'map', 'galaxy'].includes(action)) {
     resolvePendingEvent(normalizedCommand);
     render();
     return;
@@ -2614,11 +4677,44 @@ function executeCommand(command: string): void {
     showLedger();
   } else if (action === 'stocks') {
     activeLogTab = 'stocks';
+  } else if (action === 'realty') {
+    activeLogTab = 'realty';
+  } else if (action === 'map' || action === 'galaxy') {
+    if (parts[1] === 'zoom' && parts[2]) {
+      selectedMapSystem = parts[2] as StarSystemId;
+      activeLogTab = 'map';
+      renderLogPanel();
+      return;
+    }
+
+    if (parts[1] === 'navigate' && parts[2]) {
+      const destinationSystem = parts[2] as StarSystemId;
+      const destinationLocation = starSystemToLocation[destinationSystem];
+      if (travel(destinationLocation)) {
+        selectedMapSystem = destinationSystem;
+      }
+      return;
+    }
+
+    if (parts[1] === 'back') {
+      selectedMapSystem = null;
+      activeLogTab = 'map';
+      renderLogPanel();
+      return;
+    }
+
+    selectedMapSystem = null;
+    activeLogTab = 'map';
   } else if (action === 'tab') {
     if (parts[1] === 'ledger') activeSidebarTab = 'ledger';
     if (parts[1] === 'market') activeSidebarTab = 'market';
     if (parts[1] === 'bargain') activeSidebarTab = 'bargain';
     if (parts[1] === 'stocks') activeLogTab = 'stocks';
+    if (parts[1] === 'map' || parts[1] === 'galaxy') {
+      activeLogTab = 'map';
+      selectedMapSystem = null;
+    }
+    if (parts[1] === 'realty') activeLogTab = 'realty';
   } else if (action === 'vendor') {
     selectVendor(parts[1] ?? '');
     return;
@@ -2634,6 +4730,46 @@ function executeCommand(command: string): void {
     requestAlliance();
   } else if (action === 'travel') {
     travel(parts[1]);
+  } else if (action === 'property') {
+    if (parts[1] === 'list') {
+      showPropertyList();
+    } else if (parts[1] === 'inspect') {
+      inspectProperty(parts[2]);
+    } else if (parts[1] === 'buy') {
+      buyProperty(parts[2]);
+    } else if (parts[1] === 'sell') {
+      sellProperty(parts[2]);
+    } else if (parts[1] === 'upgrade') {
+      upgradeProperty(parts[2]);
+    } else if (parts[1] === 'lease') {
+      leaseProperty(parts[2]);
+    } else if (parts[1] === 'release') {
+      releaseProperty(parts[2]);
+    } else {
+      log('Invalid property command. Use: property list, property inspect <id>, property buy <id>, property sell <id>, property upgrade <id>, property lease <id>, property release <id>.');
+    }
+  } else if (action === 'star') {
+    if (parts[1] === 'inspect') {
+      inspectStarSystem(parts[2]);
+    } else if (parts[1] === 'farm') {
+      farmStarResources(parts[2]);
+    } else if (parts[1] === 'claim') {
+      claimStarSystem(parts[2]);
+    } else {
+      log('Invalid star command. Use: star inspect <id>, star claim <id>, or star farm <id>.');
+    }
+  } else if (action === 'planet') {
+    if (parts[1] === 'inspect') {
+      inspectPlanet(parts[2]);
+    } else if (parts[1] === 'farm') {
+      farmPlanetResources(parts[2]);
+    } else if (parts[1] === 'claim') {
+      claimPlanet(parts[2]);
+    } else if (parts[1] === 'navigate') {
+      navigateToPlanet(parts[2]);
+    } else {
+      log('Invalid planet command. Use: planet inspect <id>, planet claim <id>, planet farm <id>, or planet navigate <id>.');
+    }
   } else if (action === 'stock') {
     if (parts[1] === 'buy') {
       buyStock(parts[2], parts[3]);
@@ -2642,6 +4778,39 @@ function executeCommand(command: string): void {
     } else {
       log('Invalid stock command. Use: stock buy vega_credit 1 or stock sell vega_credit 1.');
     }
+  } else if (action === 'tab') {
+    if (parts[1] === 'ledger') activeSidebarTab = 'ledger';
+    if (parts[1] === 'market') activeSidebarTab = 'market';
+    if (parts[1] === 'bargain') activeSidebarTab = 'bargain';
+    if (parts[1] === 'stocks') activeLogTab = 'stocks';
+    if (parts[1] === 'map' || parts[1] === 'galaxy') {
+      activeLogTab = 'map';
+      selectedMapSystem = null;
+    }
+    if (parts[1] === 'realty') activeLogTab = 'realty';
+    if (parts[1] === 'world') activeLogTab = 'world';
+  } else if (action === 'world') {
+    if (parts[1] === 'toggle' && parts[2]) {
+      const systemId = parts[2] as StarSystemId;
+      if (expandedSystems[systemId] === undefined) {
+        log(`Unknown system: ${systemId}`);
+        return;
+      }
+      expandedSystems[systemId] = !expandedSystems[systemId];
+      activeLogTab = 'world';
+      renderLogPanel();
+      return;
+    }
+
+    activeLogTab = 'world';
+  } else if (action === 'takeover') {
+    attemptHostileTakeover(parts[1]);
+  } else if (action === 'merge') {
+    attemptStockMerge(parts[1], parts[2]);
+  } else if (action === 'manipulate') {
+    manipulateMarket(parts[1], parts[2]);
+  } else if (action === 'etf') {
+    activateAllianceETF(parts[1]);
   } else if (action === 'leverage') {
     setStockLeverage(parts[1]);
   } else if (action === 'bargain') {

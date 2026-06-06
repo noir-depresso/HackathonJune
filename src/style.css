@@ -89,10 +89,124 @@ input {
 
 .log-tab-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
   padding: 10px 12px 0;
   border-bottom: 1px solid #333;
+}
+
+.galaxy-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.legend {
+  font-size: 13px;
+  color: #cfdff8;
+}
+
+.legend.owned {
+  color: #ffeaa8;
+}
+
+.galaxy-action-button,
+.property-action-button {
+  margin-top: 8px;
+  margin-right: 8px;
+  padding: 8px 10px;
+  border: 1px solid #557b9d;
+  background: #122137;
+  color: #d1e7ff;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.galaxy-action-button:hover,
+.property-action-button:hover {
+  border-color: #8ff3ff;
+  background: rgba(22, 56, 92, 0.92);
+}
+
+.galaxy-system-card {
+  padding: 14px;
+  background: rgba(6, 18, 32, 0.95);
+  border: 1px solid #234061;
+  border-radius: 12px;
+}
+
+.galaxy-map-system {
+  min-height: 260px;
+}
+
+.galaxy-nebula circle {
+  fill: rgba(78, 145, 203, 0.12);
+}
+
+.galaxy-star-node:hover circle {
+  transform-origin: center;
+  transform: scale(1.2);
+}
+
+.galaxy-star-node:hover text {
+  fill: #ffffff;
+}
+
+.galaxy-planet {
+  fill: #8ad3ff;
+  stroke: rgba(147, 210, 255, 0.7);
+  stroke-width: 2;
+}
+
+.galaxy-planet.owned {
+  fill: #ffd16b;
+  stroke: rgba(255, 205, 110, 0.9);
+}
+
+.galaxy-system-star {
+  fill: #ffcc5c;
+  stroke: rgba(255, 220, 120, 0.9);
+  stroke-width: 2;
+}
+
+.galaxy-system-label {
+  font-size: 14px;
+  fill: #fff0a8;
+}
+
+.galaxy-planet-label {
+  font-size: 12px;
+}
+
+.galaxy-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.galaxy-planet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.galaxy-planet-card {
+  padding: 10px;
+  border: 1px solid #2f4d6f;
+  border-radius: 10px;
+  background: rgba(10, 16, 28, 0.9);
+}
+
+.galaxy-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(98, 148, 189, 0.28);
+  font-size: 11px;
+  color: #c7e0ff;
 }
 
 .era-log {
@@ -148,6 +262,58 @@ input {
   grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
   margin-bottom: 10px;
+}
+
+.galaxy-map-card {
+  padding: 12px;
+  background: rgba(5, 16, 33, 0.92);
+  border: 1px solid #2e5e7d;
+  border-radius: 10px;
+}
+
+.galaxy-map {
+  width: 100%;
+  height: 360px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: radial-gradient(circle at 20% 10%, rgba(76, 155, 255, 0.14), transparent 28%),
+    radial-gradient(circle at 85% 15%, rgba(255, 207, 114, 0.16), transparent 24%),
+    radial-gradient(circle at 50% 55%, rgba(79, 209, 189, 0.1), transparent 35%),
+    linear-gradient(135deg, #050b16 0%, #091526 48%, #06101f 100%);
+}
+
+.galaxy-map svg {
+  width: 100%;
+  height: 100%;
+}
+
+.galaxy-background {
+  fill: #020b16;
+}
+
+.galaxy-star {
+  fill: #a7d8ff;
+  stroke: rgba(172, 226, 255, 0.75);
+  stroke-width: 2;
+}
+
+.galaxy-star.owned {
+  fill: #ffd166;
+  stroke: rgba(255, 209, 102, 0.9);
+}
+
+.galaxy-label {
+  font-size: 14px;
+  fill: #cbd8ff;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.galaxy-label.owned {
+  fill: #ffeaa8;
+}
+
+.spaceship-icon {
+  font-size: 18px;
 }
 
 .tab-button {
@@ -227,6 +393,134 @@ input {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 4px;
+}
+
+.property-card {
+  border: 1px solid #333;
+  background: #121212;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.property-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.property-line {
+  color: #c5c5c5;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.property-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid #444;
+  background: #191919;
+  color: #8ff3ff;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.property-badge.leased {
+  border-color: #ff8f8f;
+  background: #2b1a1a;
+  color: #ffb6b6;
+}
+
+.property-badge.quality-high {
+  border-color: #7eff5f;
+  background: #142712;
+  color: #b6ff9f;
+}
+
+.property-badge.quality-medium {
+  border-color: #8ff3ff;
+  background: #11232d;
+  color: #8ff3ff;
+}
+
+.property-badge.quality-low {
+  border-color: #f9c74f;
+  background: #2e2410;
+  color: #ffe59f;
+}
+
+.property-badge.lease-allowed {
+  border-color: #6d9cff;
+  background: #101a2a;
+  color: #a8c6ff;
+}
+
+.planet-card,
+.star-card {
+  border: 1px solid #333;
+  background: #121212;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.command-hint {
+  color: #999;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.property-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.property-action-button {
+  border: 1px solid #444;
+  background: #161616;
+  color: #ddd;
+  padding: 5px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.property-action-button:hover {
+  border-color: #8ff3ff;
+  background: #1d384a;
+}
+
+.property-action-button.sell {
+  border-color: #ff8f8f;
+  color: #ffcccc;
+}
+
+.property-action-button.sell:hover {
+  background: #3c1b1b;
+}
+
+.property-action-button.farm-button {
+  border-color: #8fffb6;
+  color: #c9ffe4;
+}
+
+.property-action-button.farm-button:hover {
+  background: #1b3426;
+}
+
+.realty-summary {
+  border: 1px solid #444;
+  background: #161616;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.realty-help {
+  color: #8ff3ff;
+  font-size: 12px;
+  margin-bottom: 14px;
 }
 
 .vendor-head span {
