@@ -501,9 +501,9 @@ const conversationEntries: string[] = [];
 const accountEntries: string[] = [];
 const stockPositions: Partial<Record<StockId, StockPosition>> = {};
 const factionConversationMemory: Record<BargainFactionId, FactionConversationMemory> = {
-  vega_union: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0 },
-  eclipse_combine: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0 },
-  nova_frontier: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0 },
+  vega_union: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0, anger: 0 },
+  eclipse_combine: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0, anger: 0 },
+  nova_frontier: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0, anger: 0 },
 };
 const stockMarketBias: Record<StockId, number> = {
   vega_credit: 0,
@@ -778,6 +778,38 @@ function bargainingPlayerInventory(): BargainInventory {
   };
 }
 
+function factionForNegotiation(factionId: BargainFactionId): BargainFaction {
+  const faction = structuredClone(factionStates[factionId]) as BargainFaction;
+  applyAngerToNegotiationFaction(factionId, faction);
+  return faction;
+}
+
+function factionStatesForNegotiation(): Record<BargainFactionId, BargainFaction> {
+  const states = structuredClone(factionStates) as Record<BargainFactionId, BargainFaction>;
+
+  for (const factionId of Object.keys(states) as BargainFactionId[]) {
+    applyAngerToNegotiationFaction(factionId, states[factionId]);
+  }
+
+  return states;
+}
+
+function applyAngerToNegotiationFaction(factionId: BargainFactionId, faction: BargainFaction): void {
+  const anger = factionConversationMemory[factionId].anger;
+
+  if (anger <= 0) {
+    return;
+  }
+
+  faction.relationshipWithPlayer = clampNumber(
+    faction.relationshipWithPlayer - Math.floor(anger / 5),
+    -100,
+    100
+  );
+  faction.trust = clampNumber(faction.trust - Math.floor(anger / 4), 0, 100);
+  faction.greed = Math.round((faction.greed + anger / 150) * 100) / 100;
+}
+
 function commitBargainingInventory(inventory: BargainInventory): void {
   player.credits = inventory.credits ?? 0;
   player.supplies.water = inventory.water ?? 0;
@@ -807,6 +839,14 @@ function relationshipTier(relationship: number): string {
   return 'Alliance Ready';
 }
 
+function angerMoodLabel(anger: number): string {
+  if (anger >= 85) return 'furious';
+  if (anger >= 65) return 'angry';
+  if (anger >= 40) return 'irritated';
+  if (anger >= 18) return 'wary';
+  return 'steady';
+}
+
 function allianceLabel(status: AllianceStatus): string {
   if (status === 'trade_pact') return 'Trade Pact';
   if (status === 'alliance') return 'Alliance Contract';
@@ -823,6 +863,10 @@ function stanceLabel(stance: FactionStance): string {
 
 function randomPick<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function randomFaction(exclude: FactionId[] = []): FactionId {
@@ -1683,13 +1727,18 @@ function renderStatus(): void {
   const location = currentLocation();
   const vendor = currentVendor();
   const factionState = currentFactionState();
+  const channelFaction = factionStates[bargainingState.selectedFactionId];
+  const channelMemory = factionConversationMemory[bargainingState.selectedFactionId];
 
   statusEl.innerHTML = `
     <div class="stat-row"><span>Credits</span><strong>${player.credits}</strong></div>
     <div class="stat-row"><span>Turn Income</span><strong>${incomePerTurn()}</strong></div>
     <div class="stat-row"><span>Location</span><strong>${location.name}</strong></div>
     <div class="stat-row"><span>Vendor</span><strong>${vendor.name}</strong></div>
-    <div class="stat-row"><span>Standing</span><strong>${factionState.relationship}</strong></div>
+    <div class="stat-row"><span>Port Standing</span><strong>${factionState.relationship}</strong></div>
+    <div class="stat-row"><span>Channel</span><strong>${channelFaction.name}</strong></div>
+    <div class="stat-row"><span>Channel Standing</span><strong>${channelFaction.relationshipWithPlayer}</strong></div>
+    <div class="stat-row"><span>Channel Anger</span><strong>${channelMemory.anger} / 100</strong></div>
     <div class="stat-row"><span>Cargo</span><strong>${cargoUsed()} / ${player.cargoCapacity}</strong></div>
   `;
 }
@@ -1873,6 +1922,8 @@ function bargainingFactionViews(): BargainingFactionView[] {
     name: faction.name,
     relationshipWithPlayer: faction.relationshipWithPlayer,
     trust: faction.trust,
+    anger: factionConversationMemory[factionId as BargainFactionId].anger,
+    mood: angerMoodLabel(factionConversationMemory[factionId as BargainFactionId].anger),
     inventory: faction.inventory as ResourceBundle,
   }));
 }
@@ -2108,7 +2159,8 @@ ${factionsList}`);
 
 async function submitBargainingOffer(offer: NegotiationOffer): Promise<void> {
   const faction = factionStates[offer.toFaction];
-  const result = evaluateOffer(offer, faction);
+  const result = evaluateOffer(offer, factionForNegotiation(offer.toFaction));
+  applyBargainMoodAfterResult(offer.toFaction, result);
   const fallbackDialogue = generateDialogue(result, faction.name);
 
   bargainingState.selectedFactionId = offer.toFaction;
@@ -2122,16 +2174,23 @@ async function submitBargainingOffer(offer: NegotiationOffer): Promise<void> {
     factionName: faction.name,
     factionIdeology: faction.ideology,
     factionPersonality: faction.personality,
+    factionSpeechProfile: faction.speechProfile,
     personalityPass: faction.personalityPasses.neutral,
     relationshipWithPlayer: faction.relationshipWithPlayer,
     trust: faction.trust,
     offer,
     result,
     fallbackDialogue,
+    memory: factionConversationMemory[offer.toFaction],
   });
 
   bargainingState.message = aiMessage;
   log(aiMessage);
+  rememberFactionExchange(
+    offer.toFaction,
+    `Offered ${formatBundle(offer.offered)} for ${formatBundle(offer.requested)}`,
+    aiMessage
+  );
   render();
 }
 
@@ -2148,8 +2207,20 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
     factionInventories: factionInventorySnapshot(),
     factionProfiles: factionProfileSnapshot(),
   });
-  const freeformResult = evaluateStructuredBargain(structured, factionStates, bargainingPlayerInventory());
+  const memory = noteIncomingFactionMessage(structured.toFaction, message);
+  const chatImpact = evaluateChatReputationImpact(message, structured.toFaction, memory.repeatCount);
+  applyChatMoodImpact(structured.toFaction, chatImpact);
+
+  const freeformResult = evaluateStructuredBargain(
+    structured,
+    factionStatesForNegotiation(),
+    bargainingPlayerInventory()
+  );
   const faction = factionStates[structured.toFaction];
+
+  if (freeformResult.offer) {
+    applyBargainMoodAfterResult(structured.toFaction, freeformResult.computedResult);
+  }
 
   bargainingState.selectedFactionId = structured.toFaction;
   bargainingState.pendingOffer =
@@ -2163,22 +2234,24 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
 
   if (!freeformResult.offer) {
     const missing = structured.missingInfo.join(', ') || 'a clear offer';
-    const responseMessage = /\d/.test(message)
-      ? `${faction.name}: Clarify ${missing}.`
-      : await generateFactionChatMessage({
-          message,
-          factionName: faction.name,
-          factionIdeology: faction.ideology,
-          factionPersonality: faction.personality,
-          relationshipWithPlayer: faction.relationshipWithPlayer,
-          trust: faction.trust,
-          voiceStyle: faction.voiceStyle,
-          personalityPass: freeformResult.audit.personalityPass,
-          playerInventory: bargainingPlayerInventory(),
-          factionInventory: faction.inventory as ResourceBundle,
-          lastBargainingMessage: bargainingState.message,
-          memory: factionConversationMemory[structured.toFaction],
-        });
+    const responseMessage = await generateFactionChatMessage({
+      message,
+      factionName: faction.name,
+      factionIdeology: faction.ideology,
+      factionPersonality: faction.personality,
+      factionSpeechProfile: faction.speechProfile,
+      relationshipWithPlayer: faction.relationshipWithPlayer,
+      trust: faction.trust,
+      voiceStyle: faction.voiceStyle,
+      personalityPass: freeformResult.audit.personalityPass,
+      playerInventory: bargainingPlayerInventory(),
+      factionInventory: faction.inventory as ResourceBundle,
+      lastBargainingMessage: bargainingState.message,
+      memory,
+      chatReputationDelta: chatImpact.standingDelta,
+      chatReputationReasons: chatImpact.reasons,
+      clarificationNeeded: structured.missingInfo.length > 0 ? structured.missingInfo : [missing],
+    });
 
     bargainingState.message = responseMessage;
     log(responseMessage);
@@ -2192,6 +2265,7 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
     factionName: faction.name,
     factionIdeology: faction.ideology,
     factionPersonality: faction.personality,
+    factionSpeechProfile: faction.speechProfile,
     personalityPass: freeformResult.audit.personalityPass,
     relationshipWithPlayer: faction.relationshipWithPlayer,
     trust: faction.trust,
@@ -2200,6 +2274,7 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
     fallbackDialogue,
     structuredIntent: structured,
     audit: freeformResult.audit,
+    memory,
   });
 
   bargainingState.message = aiMessage;
@@ -2228,6 +2303,7 @@ function factionProfileSnapshot(): Record<BargainFactionId, unknown> {
       ideology: faction.ideology,
       personality: faction.personality,
       voiceStyle: faction.voiceStyle,
+      speechProfile: faction.speechProfile,
       personalityPasses: faction.personalityPasses,
       reputationRules: faction.reputationRules,
       relationshipWithPlayer: faction.relationshipWithPlayer,
@@ -2244,9 +2320,7 @@ function rememberFactionExchange(factionId: BargainFactionId, playerMessage: str
   const memory = factionConversationMemory[factionId];
   const topic = conversationTopic(playerMessage);
 
-  if (topic === memory.repeatedTopic) {
-    memory.repeatCount += 1;
-  } else {
+  if (topic !== memory.repeatedTopic) {
     memory.repeatedTopic = topic;
     memory.repeatCount = 1;
   }
@@ -2260,34 +2334,61 @@ function rememberFactionExchange(factionId: BargainFactionId, playerMessage: str
   memory.mood = summarizeFactionMood(factionId, memory.repeatCount);
 }
 
+function noteIncomingFactionMessage(factionId: BargainFactionId, playerMessage: string): FactionConversationMemory {
+  const memory = factionConversationMemory[factionId];
+  const topic = conversationTopic(playerMessage);
+
+  if (topic === memory.repeatedTopic) {
+    memory.repeatCount += 1;
+  } else {
+    memory.repeatedTopic = topic;
+    memory.repeatCount = 1;
+  }
+
+  memory.mood = summarizeFactionMood(factionId, memory.repeatCount);
+  return memory;
+}
+
 function conversationTopic(message: string): string {
   const normalized = message.toLowerCase().trim();
 
   if (/^(h|g)?ello\b|^hi\b|^hey\b|greetings/.test(normalized)) return 'greeting';
   if (/how.*(day|doing)|how are you|what.*up|how goes/.test(normalized)) return 'small talk';
+  if (/ragebait|baiting|annoy|irritat|mad|angry|piss|waste your time|messing with you/.test(normalized)) return 'provocation';
+  if (/threat|destroy|attack|or else|force|kill|hurt|wipe/.test(normalized)) return 'threat';
   if (/trust|faith|believe|good deal|fair deal|honou?r/.test(normalized)) return 'trust';
-  if (/thank|thanks|appreciate|respect|great|kind/.test(normalized)) return 'respect';
+  if (/thank|thanks|appreciate|respect|great|kind|sorry|apologize|apology/.test(normalized)) return 'respect';
   if (/\b\d+\b/.test(normalized)) return 'proposal';
   return normalized.split(/\s+/).slice(0, 4).join(' ') || 'open channel';
 }
 
 function summarizeFactionMood(factionId: BargainFactionId, repeatCount: number): string {
   const faction = factionStates[factionId];
+  const anger = factionConversationMemory[factionId].anger;
   const patience =
-    faction.trust >= 60
-      ? 'patient'
-      : faction.trust <= 25
-        ? 'impatient'
-        : 'measured';
+    anger >= 70
+      ? 'angry'
+      : anger >= 40
+        ? 'irritated'
+        : faction.trust >= 60
+          ? 'patient'
+          : faction.trust <= 25
+            ? 'impatient'
+            : 'measured';
   const relation =
     faction.relationshipWithPlayer >= 35
       ? 'warm'
       : faction.relationshipWithPlayer < -10
         ? 'suspicious'
         : 'guarded';
-  const repetition = repeatCount >= 3 ? 'noticing repeated phrasing' : 'following the conversation';
+  const repetition =
+    repeatCount >= 6
+      ? 'tired of repeated phrasing'
+      : repeatCount >= 3
+        ? 'noticing repeated phrasing'
+        : 'following the conversation';
 
-  return `${patience}, ${relation}, ${repetition}`;
+  return `${patience}, ${relation}, ${repetition}, ${angerMoodLabel(anger)}`;
 }
 
 function confirmPendingOffer(): void {
@@ -2398,6 +2499,144 @@ function applyNegotiationReputationDelta(factionId: BargainFactionId, delta: num
   );
   adjustRelationship(mainFactionId, delta);
   accountLog(`NEGOTIATION | ${factionStates[factionId].name} reputation ${delta > 0 ? '+' : ''}${delta}. Trust now ${factionStates[factionId].trust}.`);
+}
+
+function evaluateChatReputationImpact(
+  message: string,
+  factionId: BargainFactionId,
+  repeatCount: number
+): { standingDelta: number; angerDelta: number; reasons: string[] } {
+  const normalized = message.toLowerCase();
+  const faction = factionStates[factionId];
+  const rules = faction.reputationRules as Record<string, number>;
+  const reasons: string[] = [];
+  let standingDelta = 0;
+  let angerDelta = 0;
+
+  if (/ragebait|baiting|waste your time|messing with you|trolling|annoy you|make you mad|make you angry/.test(normalized)) {
+    standingDelta -= factionId === 'nova_frontier' ? 4 : 3;
+    angerDelta += 18;
+    reasons.push('admitted provocation');
+  }
+
+  if (/stupid|idiot|shut up|pathetic|worthless|trash|moron/.test(normalized)) {
+    standingDelta -= 4;
+    angerDelta += 16;
+    reasons.push('insulted the negotiator');
+  }
+
+  if (/threat|destroy|attack|or else|force|kill|hurt|wipe/.test(normalized)) {
+    standingDelta += Math.min(-3, rules.hostileTone ?? -3);
+    angerDelta += 22;
+    reasons.push('hostile pressure');
+  }
+
+  if (repeatCount === 2) {
+    angerDelta += 4;
+    reasons.push('repeated the same topic');
+  } else if (repeatCount === 3) {
+    standingDelta -= 1;
+    angerDelta += 8;
+    reasons.push('repeated the same topic');
+  } else if (repeatCount > 3) {
+    standingDelta -= 2;
+    angerDelta += Math.min(18, 8 + repeatCount);
+    reasons.push('kept repeating after being noticed');
+  }
+
+  if (/thank|thanks|appreciate|respect|sorry|apologize|apology|my mistake/.test(normalized)) {
+    standingDelta += 1;
+    angerDelta -= 8;
+    reasons.push('showed respect');
+  }
+
+  if (/humanitarian|mutual|fair|help both|good faith|your people|frontier|independent|cooperation/.test(normalized)) {
+    standingDelta += 1;
+    angerDelta -= 5;
+    reasons.push('spoke to faction values');
+  }
+
+  return {
+    standingDelta: clampNumber(standingDelta, -8, 4),
+    angerDelta: clampNumber(angerDelta, -14, 25),
+    reasons,
+  };
+}
+
+function applyChatMoodImpact(
+  factionId: BargainFactionId,
+  impact: { standingDelta: number; angerDelta: number; reasons: string[] }
+): void {
+  updateFactionAnger(factionId, impact.angerDelta, impact.reasons);
+
+  const mainFactionId = bargainFactionToMainFaction[factionId];
+  const trustDelta =
+    impact.standingDelta < 0
+      ? Math.floor(impact.standingDelta / 2)
+      : Math.ceil(impact.standingDelta / 2);
+
+  if (impact.standingDelta === 0) {
+    return;
+  }
+
+  factionStates[factionId].relationshipWithPlayer = Math.max(
+    -100,
+    Math.min(100, factionStates[factionId].relationshipWithPlayer + impact.standingDelta)
+  );
+  factionStates[factionId].trust = Math.max(
+    0,
+    Math.min(100, factionStates[factionId].trust + trustDelta)
+  );
+  adjustRelationship(mainFactionId, impact.standingDelta);
+  accountLog(
+    `CHAT | ${factionStates[factionId].name} standing ${impact.standingDelta > 0 ? '+' : ''}${impact.standingDelta}; trust ${trustDelta > 0 ? '+' : ''}${trustDelta}. Reason: ${impact.reasons.join(', ')}.`
+  );
+}
+
+function updateFactionAnger(factionId: BargainFactionId, change: number, reasons: string[] = []): void {
+  if (change === 0) {
+    return;
+  }
+
+  const memory = factionConversationMemory[factionId];
+  const before = memory.anger;
+  memory.anger = clampNumber(memory.anger + change, 0, 100);
+
+  if (before === memory.anger) {
+    return;
+  }
+
+  memory.mood = summarizeFactionMood(factionId, memory.repeatCount);
+  accountLog(
+    `MOOD | ${factionStates[factionId].name} anger ${before} -> ${memory.anger}${reasons.length > 0 ? ` (${reasons.join(', ')})` : ''}.`
+  );
+}
+
+function applyBargainMoodAfterResult(factionId: BargainFactionId, result: NegotiationResult): void {
+  if (result.outcome === 'accept') {
+    const generosityDelta = result.negotiator?.reputationDelta ?? 0;
+    updateFactionAnger(
+      factionId,
+      generosityDelta > 0 ? -18 : -8,
+      generosityDelta > 0 ? ['generous accepted bargain'] : ['accepted bargain']
+    );
+    return;
+  }
+
+  if (result.outcome === 'counteroffer') {
+    updateFactionAnger(factionId, 4, ['terms needed haggling']);
+    return;
+  }
+
+  if (result.reason === 'lie_detected') {
+    updateFactionAnger(factionId, 24, ['false claim']);
+  } else if (result.reason === 'shortage') {
+    updateFactionAnger(factionId, 8, ['impossible request']);
+  } else if (result.reason === 'overly_good_suspicious') {
+    updateFactionAnger(factionId, 12, ['suspicious offer']);
+  } else {
+    updateFactionAnger(factionId, 10, ['bad offer']);
+  }
 }
 
 function selectVendor(vendorId: string): void {

@@ -7,9 +7,11 @@ export type RelationshipStats = {
 
 export function relationshipDeltaAfterTrade(result: NegotiationResult): RelationshipStats {
   if (result.outcome === 'accept') {
+    const generosityDelta = result.negotiator?.reputationDelta ?? 0;
+
     return {
-      relationshipWithPlayer: 2,
-      trust: 1,
+      relationshipWithPlayer: 2 + generosityDelta,
+      trust: 1 + Math.ceil(generosityDelta / 2),
     };
   }
 

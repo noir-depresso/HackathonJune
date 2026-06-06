@@ -8,5 +8,23 @@
   "dislikedResourceMultiplier": 0.6,
   "tabooPenalty": 9999,
   "maxCounterofferMultiplier": 1.8,
-  "minCounterofferMultiplier": 1.15
+  "minCounterofferMultiplier": 1.15,
+  "negotiatorJudgment": {
+    "hardDeclineScore": -45,
+    "softDeclineScore": -30,
+    "weakAcceptScore": -20,
+    "uneasyAcceptScore": -10,
+    "fairAcceptScore": 0,
+    "favoredAcceptScore": 8,
+    "certainAcceptScore": 16,
+    "generousScore": 25,
+    "excellentScore": 55,
+    "legendaryScore": 95,
+    "maxReputationBonus": 5,
+    "softDeclineChance": 0.1,
+    "weakAcceptChance": 0.16,
+    "uneasyAcceptChance": 0.3,
+    "fairAcceptChance": 0.5,
+    "favoredAcceptChance": 0.7
+  }
 }

@@ -7,6 +7,8 @@ export type BargainingFactionView = {
   name: string;
   relationshipWithPlayer: number;
   trust: number;
+  anger: number;
+  mood: string;
   inventory: ResourceBundle;
 };
 
@@ -48,6 +50,8 @@ export function renderBargainingPanel(state: BargainingPanelState): string {
 
       <div class="stat-row"><span>Relationship</span><strong>${selectedFaction.relationshipWithPlayer}</strong></div>
       <div class="stat-row"><span>Trust</span><strong>${selectedFaction.trust}</strong></div>
+      <div class="stat-row"><span>Anger</span><strong>${selectedFaction.anger} / 100</strong></div>
+      <div class="stat-row"><span>Mood</span><strong>${selectedFaction.mood}</strong></div>
 
       <div class="bargain-grid">
         <label>

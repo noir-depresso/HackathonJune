@@ -4,6 +4,21 @@
     "ideology": "Cooperative trade federation",
     "personality": "diplomatic",
     "voiceStyle": "active_kind",
+    "speechProfile": {
+      "cadence": "warm, clear, civic, practical",
+      "values": ["mutual benefit", "public trust", "clean delivery", "future cooperation"],
+      "taboos": ["bullying", "hidden terms", "wasteful cruelty"],
+      "pressureTactics": [
+        "appeals to mutual responsibility",
+        "reminds the captain that fair dealing opens future doors",
+        "withholds coalition trust when the player acts selfishly"
+      ],
+      "sampleLines": [
+        "I can bring this to the council if your side gives me something they can defend.",
+        "Help us justify the risk, captain, and I will look for room in the price.",
+        "Good faith matters here, but it still needs cargo behind it."
+      ]
+    },
     "personalityPasses": {
       "trusted": "warm, active, generous, coalition-minded",
       "neutral": "kind but procedural, asks for mutual benefit",
@@ -55,6 +70,24 @@
     },
     "overlyGoodDealPolicy": "cautious",
     "overlyGoodDealMultiplier": 2.8,
+    "negotiatorJudgment": {
+      "hardDeclineScore": -48,
+      "softDeclineScore": -32,
+      "weakAcceptScore": -22,
+      "uneasyAcceptScore": -12,
+      "fairAcceptScore": 0,
+      "favoredAcceptScore": 9,
+      "certainAcceptScore": 18,
+      "generousScore": 24,
+      "excellentScore": 52,
+      "legendaryScore": 90,
+      "maxReputationBonus": 6,
+      "softDeclineChance": 0.08,
+      "weakAcceptChance": 0.14,
+      "uneasyAcceptChance": 0.28,
+      "fairAcceptChance": 0.52,
+      "favoredAcceptChance": 0.74
+    },
     "riskTolerance": 0.8,
     "greed": 0.9,
     "trust": 55,
@@ -73,6 +106,22 @@
     "ideology": "Corporate monopoly expansion",
     "personality": "calculating",
     "voiceStyle": "logical",
+    "speechProfile": {
+      "cadence": "precise, clipped, transactional, faintly predatory",
+      "values": ["margin", "control", "leverage", "clean risk accounting"],
+      "taboos": ["sentiment without payment", "unpriced risk", "weak posture"],
+      "pressureTactics": [
+        "frames delay as a cost",
+        "prices disrespect into the counteroffer",
+        "uses scarcity and market access as leverage",
+        "offers a worse future if the player keeps posturing"
+      ],
+      "sampleLines": [
+        "You are not buying sympathy; you are buying inventory.",
+        "Every vague sentence increases the risk premium.",
+        "Accept the counter now, or come back when the market has taught you arithmetic."
+      ]
+    },
     "personalityPasses": {
       "trusted": "precise, efficient, profit-aware, professionally respectful",
       "neutral": "logical, transactional, skeptical of sentiment",
@@ -124,6 +173,24 @@
     },
     "overlyGoodDealPolicy": "accept",
     "overlyGoodDealMultiplier": 3.5,
+    "negotiatorJudgment": {
+      "hardDeclineScore": -55,
+      "softDeclineScore": -38,
+      "weakAcceptScore": -26,
+      "uneasyAcceptScore": -14,
+      "fairAcceptScore": -2,
+      "favoredAcceptScore": 7,
+      "certainAcceptScore": 14,
+      "generousScore": 35,
+      "excellentScore": 70,
+      "legendaryScore": 115,
+      "maxReputationBonus": 3,
+      "softDeclineChance": 0.12,
+      "weakAcceptChance": 0.2,
+      "uneasyAcceptChance": 0.34,
+      "fairAcceptChance": 0.55,
+      "favoredAcceptChance": 0.78
+    },
     "riskTolerance": 1.2,
     "greed": 1.4,
     "trust": 30,
@@ -142,6 +209,22 @@
     "ideology": "Independent survival colonies",
     "personality": "practical",
     "voiceStyle": "active_kind",
+    "speechProfile": {
+      "cadence": "direct, human, tired, protective, frontier-sharp",
+      "values": ["survival", "independence", "water security", "honest help"],
+      "taboos": ["exploitation", "games with scarce supplies", "corporate pressure", "alien relics"],
+      "pressureTactics": [
+        "invokes hungry crews and frontier families",
+        "makes the player feel the moral cost of bad terms",
+        "cuts warmth quickly when time is wasted",
+        "demands concrete help before offering trust"
+      ],
+      "sampleLines": [
+        "I have families counting water, captain. Do not dress a bad deal as friendship.",
+        "Bring help we can use, and you will hear my voice change.",
+        "Waste my time again and the next price carries the weight of it."
+      ]
+    },
     "personalityPasses": {
       "trusted": "direct, warm, protective, freedom-focused",
       "neutral": "practical, guarded, community-first",
@@ -193,6 +276,24 @@
     },
     "overlyGoodDealPolicy": "decline",
     "overlyGoodDealMultiplier": 2.2,
+    "negotiatorJudgment": {
+      "hardDeclineScore": -40,
+      "softDeclineScore": -25,
+      "weakAcceptScore": -16,
+      "uneasyAcceptScore": -8,
+      "fairAcceptScore": 2,
+      "favoredAcceptScore": 12,
+      "certainAcceptScore": 22,
+      "generousScore": 18,
+      "excellentScore": 42,
+      "legendaryScore": 78,
+      "maxReputationBonus": 7,
+      "softDeclineChance": 0.06,
+      "weakAcceptChance": 0.12,
+      "uneasyAcceptChance": 0.26,
+      "fairAcceptChance": 0.46,
+      "favoredAcceptChance": 0.66
+    },
     "riskTolerance": 0.9,
     "greed": 1.05,
     "trust": 42,

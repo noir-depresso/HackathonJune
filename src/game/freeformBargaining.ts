@@ -1,5 +1,5 @@
 import resources from '../data/resources.json';
-import { evaluateOffer } from './negotiation';
+import { applyNegotiatorJudgment, evaluateOfferBaseline } from './negotiation';
 import type { Faction, FactionId, NegotiationOffer, NegotiationResult, ResourceBundle, ResourceId } from './negotiation';
 import type { Inventory } from './trade';
 
@@ -243,7 +243,7 @@ export function evaluateStructuredBargain(
       : undefined;
 
   const baseResult = offer
-    ? evaluateOffer(offer, faction)
+    ? evaluateOfferBaseline(offer, faction)
     : emptyResult('low_value');
 
   const audit = auditStructuredBargain(structured, faction, playerInventory, offer);
@@ -373,45 +373,7 @@ function applyAuditToResult(
     };
   }
 
-  if (audit.overlyGoodDeal && faction.overlyGoodDealPolicy !== 'accept') {
-    result = {
-      ...result,
-      outcome: faction.overlyGoodDealPolicy === 'decline' ? 'reject' : 'counteroffer',
-      reason: 'overly_good_suspicious',
-      counteroffer:
-        faction.overlyGoodDealPolicy === 'decline' || !offer
-          ? undefined
-          : makeSuspiciousCounteroffer(offer),
-    };
-  }
-
-  return result;
-}
-
-function makeSuspiciousCounteroffer(offer: NegotiationOffer): NegotiationOffer {
-  const counteroffer: NegotiationOffer = {
-    fromFaction: offer.fromFaction,
-    toFaction: offer.toFaction,
-    offered: { ...offer.offered },
-    requested: { ...offer.requested },
-  };
-  const mostValuableOffered = Object.keys(counteroffer.offered).sort((left, right) => {
-    const leftValue =
-      (resources[left as ResourceId]?.baseValue ?? 0) * (counteroffer.offered[left as ResourceId] ?? 0);
-    const rightValue =
-      (resources[right as ResourceId]?.baseValue ?? 0) * (counteroffer.offered[right as ResourceId] ?? 0);
-
-    return rightValue - leftValue;
-  })[0] as ResourceId | undefined;
-
-  if (mostValuableOffered) {
-    counteroffer.offered[mostValuableOffered] = Math.max(
-      1,
-      Math.floor((counteroffer.offered[mostValuableOffered] ?? 1) * 0.65)
-    );
-  }
-
-  return counteroffer;
+  return applyNegotiatorJudgment(result, offer, faction);
 }
 
 function isOverlyGoodDeal(offer: NegotiationOffer, faction: Faction): boolean {
