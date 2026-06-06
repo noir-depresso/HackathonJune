@@ -1,0 +1,40 @@
+{
+  "kharon_belt": {
+    "name": "Kharon Belt",
+    "owner": "eclipse_combine",
+    "type": "mining",
+    "basePrice": 600,
+    "resourceOutput": {
+      "ore": 20,
+      "fuel_cells": 5
+    },
+    "strategicValue": 80,
+    "isForSale": true,
+    "leaseAllowed": true
+  },
+  "elysian_depots": {
+    "name": "Elysian Depots",
+    "owner": "vega_union",
+    "type": "logistics",
+    "basePrice": 450,
+    "resourceOutput": {
+      "water": 12,
+      "medicine": 3
+    },
+    "strategicValue": 50,
+    "isForSale": true,
+    "leaseAllowed": true
+  },
+  "nova_wells": {
+    "name": "Nova Wells",
+    "owner": "nova_frontier",
+    "type": "water",
+    "basePrice": 520,
+    "resourceOutput": {
+      "water": 30
+    },
+    "strategicValue": 70,
+    "isForSale": false,
+    "leaseAllowed": true
+  }
+}

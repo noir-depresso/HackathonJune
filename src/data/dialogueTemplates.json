@@ -1,0 +1,25 @@
+{
+  "accept": [
+    "A fair exchange. The {faction} accepts your offer.",
+    "Your terms are reasonable. We will proceed with the trade.",
+    "This bargain benefits both sides. Accepted."
+  ],
+  "reject": [
+    "Your offer is unacceptable. The {faction} rejects this bargain.",
+    "You undervalue what we provide. Return with a serious offer.",
+    "No. This trade weakens us more than it helps us."
+  ],
+  "counteroffer": [
+    "Your offer is close, but not enough. We propose: {counteroffer}.",
+    "The deal has potential. Adjust your terms to {counteroffer}, and we may agree.",
+    "We will not accept as written. Our counteroffer is {counteroffer}."
+  ],
+  "taboo": [
+    "We will not trade in {resource}. Offer something else.",
+    "That resource is forbidden among our people. Remove it from the offer."
+  ],
+  "shortage": [
+    "We cannot provide resources we do not hold.",
+    "Our stores do not contain enough to satisfy that request."
+  ]
+}

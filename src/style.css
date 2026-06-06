@@ -4,6 +4,8 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
   background: #050505;
   color: #e8e8e8;
   font-family: "MS Gothic", "Consolas", "Courier New", monospace;
@@ -15,14 +17,104 @@ input {
 }
 
 .era-window {
+  position: relative;
+  z-index: 1;
   width: min(1200px, 100vw);
   height: 100vh;
   margin: 0 auto;
-  background: #101010;
+  background: rgba(16, 16, 16, 0.94);
   border-left: 2px solid #777;
   border-right: 2px solid #777;
   display: grid;
   grid-template-rows: 44px 1fr 210px;
+}
+
+.equation-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 239, 154, 0.025) 1px, transparent 1px),
+    linear-gradient(rgba(255, 239, 154, 0.02) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+.equation-bg span {
+  position: absolute;
+  color: rgba(255, 239, 154, 0.14);
+  font-size: 15px;
+  white-space: nowrap;
+  animation: equation-drift 24s linear infinite;
+}
+
+.equation-bg span:nth-child(1) {
+  left: 4%;
+  top: 8%;
+}
+
+.equation-bg span:nth-child(2) {
+  left: 46%;
+  top: 14%;
+  animation-duration: 30s;
+}
+
+.equation-bg span:nth-child(3) {
+  left: 12%;
+  top: 31%;
+  animation-duration: 36s;
+}
+
+.equation-bg span:nth-child(4) {
+  left: 64%;
+  top: 38%;
+  animation-duration: 28s;
+}
+
+.equation-bg span:nth-child(5) {
+  left: 3%;
+  top: 56%;
+  animation-duration: 34s;
+}
+
+.equation-bg span:nth-child(6) {
+  left: 70%;
+  top: 61%;
+}
+
+.equation-bg span:nth-child(7) {
+  left: 20%;
+  top: 78%;
+  animation-duration: 29s;
+}
+
+.equation-bg span:nth-child(8) {
+  left: 58%;
+  top: 83%;
+  animation-duration: 33s;
+}
+
+.equation-bg span:nth-child(9) {
+  left: 80%;
+  top: 22%;
+  animation-duration: 37s;
+}
+
+.equation-bg span:nth-child(10) {
+  left: 35%;
+  top: 48%;
+  animation-duration: 31s;
+}
+
+@keyframes equation-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-28px, -80px, 0);
+  }
 }
 
 .era-header {
@@ -54,7 +146,7 @@ input {
   min-height: 0;
   overflow-y: auto;
   padding: 16px;
-  background: #080808;
+  background: rgba(8, 8, 8, 0.96);
   border-right: 2px solid #777;
   white-space: pre-wrap;
   line-height: 1.5;
@@ -72,7 +164,7 @@ input {
 .era-sidebar {
   min-height: 0;
   overflow-y: auto;
-  background: #111;
+  background: rgba(17, 17, 17, 0.96);
 }
 
 .era-box {
@@ -110,7 +202,7 @@ input {
 
 .era-command-area {
   border-top: 2px solid #777;
-  background: #151515;
+  background: rgba(21, 21, 21, 0.96);
   padding: 10px;
 }
 
@@ -171,17 +263,72 @@ input {
   border-color: #ffef9a;
 }
 
+.bargaining-form {
+  display: grid;
+  gap: 8px;
+}
+
+.bargaining-form label {
+  display: grid;
+  gap: 4px;
+  color: #cccccc;
+}
+
+.bargaining-form select,
+.bargaining-form input {
+  width: 100%;
+  min-width: 0;
+  background: #080808;
+  color: #ffffff;
+  border: 1px solid #555;
+  padding: 6px 8px;
+}
+
+.bargain-grid {
+  display: grid;
+  grid-template-columns: 1fr 70px;
+  gap: 6px;
+}
+
+.bargain-submit {
+  width: 100%;
+  text-align: center;
+}
+
+.bargain-inventory {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  line-height: 1.4;
+}
+
+.bargain-message {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #555;
+  color: #ffffff;
+  line-height: 1.4;
+}
+
+.bargain-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 @media (max-width: 850px) {
   .era-window {
-    grid-template-rows: 44px 1fr 260px;
+    grid-template-rows: 44px minmax(0, 1fr) 260px;
   }
 
   .era-main {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(260px, 1fr) minmax(220px, 45vh);
   }
 
   .era-sidebar {
-    display: none;
+    border-top: 2px solid #777;
   }
 
   .era-command-grid {

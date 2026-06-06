@@ -1,0 +1,11 @@
+{
+  "fromFaction": "player",
+  "toFaction": "vega_union",
+  "offered": {
+    "credits": 140,
+    "water": 3
+  },
+  "requested": {
+    "medicine": 1
+  }
+}
