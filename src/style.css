@@ -88,11 +88,27 @@ input {
   padding-bottom: 6px;
 }
 
+.box-subtitle {
+  margin: 4px 0 6px;
+  color: #8ff3ff;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.inventory-separator {
+  margin-top: 12px;
+}
+
 .stat-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   padding: 3px 0;
+}
+
+.stat-row.danger span,
+.stat-row.danger strong {
+  color: #ff8f8f;
 }
 
 .stat-row span {
@@ -140,6 +156,11 @@ input {
   color: #ffffff;
 }
 
+.event-command-button {
+  border-color: #8ff3ff;
+  background: #1a2326;
+}
+
 .command-number {
   display: inline-block;
   color: #ffef9a;
@@ -169,6 +190,18 @@ input {
 
 .manual-form input:focus {
   border-color: #ffef9a;
+}
+
+.manual-form input:disabled {
+  color: #999;
+  border-color: #444;
+}
+
+.game-over-box {
+  border: 1px solid #ff8f8f;
+  background: rgba(120, 20, 20, 0.28);
+  color: #ffd4d4;
+  padding: 10px;
 }
 
 @media (max-width: 850px) {
