@@ -6,6 +6,7 @@ import { generateBargainingAIMessage, generateFactionChatMessage, requestStructu
 import { createNegotiationFaction, evaluateOffer } from './negotiation';
 import type { Faction, NegotiationOffer, NegotiationResult, ResourceBundle, ResourceId } from './negotiation';
 import { evaluateStructuredBargain } from './freeformBargaining';
+import { currentVendor } from './gameState';
 import { relationshipDeltaAfterTrade } from './relationships';
 import type { RelationshipStats } from './relationships';
 import { influenceBundleStocks, influenceFactionStocks } from './stockMarket';
@@ -65,6 +66,7 @@ export async function submitBargainingOffer(state: GameState, offer: Negotiation
   const factionId = coerceFactionId(offer.toFaction);
   const normalizedOffer = { ...offer, toFaction: factionId };
   const faction = negotiationFactionFromState(state, factionId);
+  const vendor = bargainVendorContext(state, factionId);
   const result = evaluateOffer(normalizedOffer, faction);
   const fallbackDialogue = generateDialogue(result, faction.name);
 
@@ -75,6 +77,9 @@ export async function submitBargainingOffer(state: GameState, offer: Negotiation
     factionName: faction.name,
     factionIdeology: faction.ideology,
     factionPersonality: faction.personality,
+    vendorName: vendor.name,
+    vendorRole: vendor.role,
+    vendorBio: vendor.bio,
     personalityPass: pickPersonalityPass(faction),
     relationship: state.diplomacy[factionId].relationship,
     trust: state.bargaining.factionStates[factionId].trust,
@@ -104,6 +109,7 @@ export async function submitFreeformBargainingMessage(state: GameState, message:
   });
   const freeformResult = evaluateStructuredBargain(structured, factionStates, playerInventoryToResourceBundle(state));
   const faction = factionStates[structured.toFaction];
+  const vendor = bargainVendorContext(state, structured.toFaction);
 
   state.bargaining.selectedFactionId = structured.toFaction;
   state.bargaining.pendingOffer =
@@ -123,6 +129,9 @@ export async function submitFreeformBargainingMessage(state: GameState, message:
           factionName: faction.name,
           factionIdeology: faction.ideology,
           factionPersonality: faction.personality,
+          vendorName: vendor.name,
+          vendorRole: vendor.role,
+          vendorBio: vendor.bio,
           relationship: faction.relationship,
           trust: faction.trust,
           voiceStyle: faction.voiceStyle,
@@ -140,6 +149,9 @@ export async function submitFreeformBargainingMessage(state: GameState, message:
     factionName: faction.name,
     factionIdeology: faction.ideology,
     factionPersonality: faction.personality,
+    vendorName: vendor.name,
+    vendorRole: vendor.role,
+    vendorBio: vendor.bio,
     personalityPass: freeformResult.audit.personalityPass,
     relationship: faction.relationship,
     trust: faction.trust,
@@ -228,6 +240,28 @@ function negotiationFactionFromState(state: GameState, factionId: FactionId): Fa
     factionState.trust,
     factionState.inventory
   );
+}
+
+function bargainVendorContext(state: GameState, factionId: FactionId): { name: string; role: string; bio: string } {
+  try {
+    const vendor = currentVendor(state);
+
+    if (vendor.factionId === factionId) {
+      return {
+        name: vendor.name,
+        role: vendor.role,
+        bio: vendor.bio,
+      };
+    }
+  } catch {
+    // Fall through to a faction-level negotiator when no vendor is selected.
+  }
+
+  return {
+    name: `${factions[factionId].name} Negotiator`,
+    role: 'Faction Envoy',
+    bio: factions[factionId].identity,
+  };
 }
 
 function negotiationFactionSnapshot(state: GameState): Record<FactionId, Faction> {

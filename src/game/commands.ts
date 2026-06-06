@@ -98,6 +98,7 @@ export function selectVendor(state: GameState, vendorId: string): void {
   }
 
   state.selectedVendorId = vendor.id;
+  state.bargaining.selectedFactionId = vendor.factionId;
   state.activeSidebarTab = 'market';
   appendLog(state, `You open a channel to ${vendor.name}.\n${vendor.role} - ${vendor.bio}`);
 }
@@ -293,14 +294,14 @@ function endTurn(state: GameState): void {
   advanceTurn(state, `You remain docked at ${currentLocation(state).name} and collect routine contract payouts.`);
 }
 
-export function executeCommand(state: GameState, command: string): void {
-  if (state.gameOver) return;
+export function executeCommand(state: GameState, command: string): boolean {
+  if (state.gameOver) return true;
 
   const normalizedCommand = command.trim().toLowerCase();
   const parts = normalizedCommand.split(/\s+/);
   const action = parts[0];
 
-  if (!action) return;
+  if (!action) return true;
 
   if (action !== 'clear') {
     appendLog(state, `> ${command}`);
@@ -311,7 +312,7 @@ export function executeCommand(state: GameState, command: string): void {
     !['status', 'relations', 'clear', 'ledger', 'market', 'bargain', 'stocks', 'stock', 'leverage', 'tab'].includes(action)
   ) {
     resolvePendingEvent(state, normalizedCommand);
-    return;
+    return true;
   }
 
   if (action === 'status') {
@@ -327,12 +328,12 @@ export function executeCommand(state: GameState, command: string): void {
   } else if (action === 'bargain') {
     state.activeSidebarTab = 'bargain';
   } else if (action === 'stocks') {
-    state.activeSidebarTab = 'stocks';
+    state.stockPopupOpen = true;
   } else if (action === 'tab') {
     if (parts[1] === 'ledger') state.activeSidebarTab = 'ledger';
     if (parts[1] === 'market') state.activeSidebarTab = 'market';
     if (parts[1] === 'bargain') state.activeSidebarTab = 'bargain';
-    if (parts[1] === 'stocks') state.activeSidebarTab = 'stocks';
+    if (parts[1] === 'stocks') state.stockPopupOpen = true;
   } else if (action === 'vendor') {
     selectVendor(state, parts[1] ?? '');
   } else if (action === 'buy') {
@@ -348,7 +349,9 @@ export function executeCommand(state: GameState, command: string): void {
   } else if (action === 'travel') {
     travel(state, parts[1]);
   } else if (action === 'stock') {
-    if (parts[1] === 'buy') {
+    if (parts[1] === 'close') {
+      state.stockPopupOpen = false;
+    } else if (parts[1] === 'buy') {
       buyStock(state, parts[2], parts[3]);
     } else if (parts[1] === 'sell') {
       sellStock(state, parts[2], parts[3]);
@@ -362,6 +365,8 @@ export function executeCommand(state: GameState, command: string): void {
   } else if (action === 'clear') {
     state.log = [];
   } else {
-    appendLog(state, `Unknown command: ${command}`);
+    return false;
   }
+
+  return true;
 }

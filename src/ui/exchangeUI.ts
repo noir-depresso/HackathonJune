@@ -1,6 +1,5 @@
 import { factionIds, factions } from '../data/factions';
 import { goods, supplies } from '../data/items';
-import { locations } from '../data/locations';
 import { stockIds } from '../data/stocks';
 import type { FactionId, GameState, GoodId, Stock, StockId, Vendor } from '../types';
 import type { FactionId as BargainingFactionId, NegotiationOffer } from '../game/negotiation';
@@ -11,7 +10,6 @@ import {
   ensureSelectedVendor,
   factionName,
   incomePerTurn,
-  locationName,
   vendorsAtLocation,
 } from '../game/gameState';
 import {
@@ -53,6 +51,8 @@ export class ExchangeUI {
   private networkPanelEl!: HTMLDivElement;
   private diplomacyEl!: HTMLDivElement;
   private commandsEl!: HTMLDivElement;
+  private stockModalEl!: HTMLDivElement;
+  private gameOverModalEl!: HTMLDivElement;
   private headerLocationEl!: HTMLDivElement;
   private headerDayEl!: HTMLDivElement;
   private manualInput!: HTMLInputElement;
@@ -77,7 +77,7 @@ export class ExchangeUI {
     this.tabMarketButton.className = state.activeSidebarTab === 'market' ? 'tab-button active-tab' : 'tab-button';
     this.tabLedgerButton.className = state.activeSidebarTab === 'ledger' ? 'tab-button active-tab' : 'tab-button';
     this.tabBargainButton.className = state.activeSidebarTab === 'bargain' ? 'tab-button active-tab' : 'tab-button';
-    this.tabStocksButton.className = state.activeSidebarTab === 'stocks' ? 'tab-button active-tab' : 'tab-button';
+    this.tabStocksButton.className = state.stockPopupOpen ? 'tab-button active-tab' : 'tab-button';
 
     this.renderLog(state);
     this.renderStatus(state);
@@ -85,10 +85,12 @@ export class ExchangeUI {
     this.renderNetwork(state);
     this.renderDiplomacy(state);
     this.renderCommands(state);
+    this.renderStockPopup(state);
+    this.renderGameOverScreen(state);
 
-    this.manualInput.disabled = state.gameOver;
+    this.manualInput.disabled = false;
     this.manualInput.placeholder = state.gameOver
-      ? 'game over'
+      ? 'type restart, new run, or click Restart Run'
       : 'type command, e.g. buy ore 1, vendor nova-vessa, gift 120';
   }
 
@@ -143,6 +145,9 @@ export class ExchangeUI {
           </form>
         </footer>
       </div>
+
+      <section id="stock-modal" class="stock-modal hidden" aria-hidden="true"></section>
+      <section id="game-over-modal" class="game-over-modal hidden" aria-hidden="true"></section>
     `;
 
     this.logEl = this.query('#log');
@@ -151,6 +156,8 @@ export class ExchangeUI {
     this.networkPanelEl = this.query('#network-panel');
     this.diplomacyEl = this.query('#diplomacy');
     this.commandsEl = this.query('#commands');
+    this.stockModalEl = this.query('#stock-modal');
+    this.gameOverModalEl = this.query('#game-over-modal');
     this.headerLocationEl = this.query('#header-location');
     this.headerDayEl = this.query('#header-day');
     this.manualInput = this.query('#manual-input');
@@ -180,7 +187,7 @@ export class ExchangeUI {
     });
 
     this.tabStocksButton.addEventListener('click', () => {
-      this.onCommand('tab stocks');
+      this.onCommand('stocks');
     });
   }
 
@@ -245,11 +252,6 @@ export class ExchangeUI {
 
     if (state.activeSidebarTab === 'bargain') {
       this.renderBargainingTab(state);
-      return;
-    }
-
-    if (state.activeSidebarTab === 'stocks') {
-      this.renderStocksTab(state);
       return;
     }
 
@@ -330,27 +332,121 @@ export class ExchangeUI {
     bindBargainingControls(this.networkPanelEl, this.bargainingHandlers);
   }
 
-  private renderStocksTab(state: GameState): void {
+  private renderStockPopup(state: GameState): void {
+    if (!state.stockPopupOpen) {
+      this.stockModalEl.className = 'stock-modal hidden';
+      this.stockModalEl.setAttribute('aria-hidden', 'true');
+      this.stockModalEl.innerHTML = '';
+      return;
+    }
+
     const rows = stockIds.map((stockId) => this.stockCard(state, stockId)).join('');
 
-    this.networkPanelEl.innerHTML = `
-      <div class="box-subtitle">FACTION EXCHANGE</div>
-      <div class="stock-summary">
-        <div class="stat-row"><span>Portfolio</span><strong>${stockPortfolioValue(state)}</strong></div>
-        <div class="stat-row"><span>Leverage</span><strong>${state.stockMarket.leverage}x</strong></div>
-      </div>
-      <div class="leverage-row">
-        <button class="tab-button ${state.stockMarket.leverage === 1 ? 'active-tab' : ''}" data-command="leverage 1">1x</button>
-        <button class="tab-button ${state.stockMarket.leverage === 2 ? 'active-tab' : ''}" data-command="leverage 2">2x</button>
-        <button class="tab-button ${state.stockMarket.leverage === 3 ? 'active-tab' : ''}" data-command="leverage 3">3x</button>
-      </div>
-      <div class="stock-board">${rows}</div>
+    this.stockModalEl.className = 'stock-modal';
+    this.stockModalEl.setAttribute('aria-hidden', 'false');
+    this.stockModalEl.innerHTML = `
+      <div class="stock-modal-backdrop" data-command="stock close"></div>
+      <section class="stock-modal-panel" role="dialog" aria-modal="true" aria-label="Faction stock exchange">
+        <header class="stock-modal-header">
+          <div>
+            <div class="box-subtitle">FACTION EXCHANGE</div>
+            <h2>Stock Market</h2>
+            <p>Faction-linked equities react to reputation, trade, route pressure, events, and bargaining outcomes.</p>
+          </div>
+          <button class="stock-modal-close" type="button" data-command="stock close">X</button>
+        </header>
+        <div class="stock-modal-summary">
+          <div class="stat-row"><span>Credits</span><strong>${state.player.credits}</strong></div>
+          <div class="stat-row"><span>Portfolio</span><strong>${stockPortfolioValue(state)}</strong></div>
+          <div class="stat-row"><span>Leverage</span><strong>${state.stockMarket.leverage}x</strong></div>
+        </div>
+        <div class="leverage-row stock-modal-leverage">
+          <button class="tab-button ${state.stockMarket.leverage === 1 ? 'active-tab' : ''}" data-command="leverage 1">1x</button>
+          <button class="tab-button ${state.stockMarket.leverage === 2 ? 'active-tab' : ''}" data-command="leverage 2">2x</button>
+          <button class="tab-button ${state.stockMarket.leverage === 3 ? 'active-tab' : ''}" data-command="leverage 3">3x</button>
+        </div>
+        <div class="stock-table-head">
+          <span>Asset</span>
+          <span>Price</span>
+          <span>Move</span>
+          <span>Owned</span>
+          <span>Value</span>
+          <span>History</span>
+          <span>Trade</span>
+        </div>
+        <div class="stock-board stock-modal-board">${rows}</div>
+      </section>
     `;
 
-    this.networkPanelEl.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) => {
-      button.addEventListener('click', () => {
-        this.onCommand(button.dataset.command ?? '');
+    this.stockModalEl.querySelectorAll<HTMLButtonElement | HTMLDivElement>('[data-command]').forEach((element) => {
+      element.addEventListener('click', () => {
+        this.onCommand(element.dataset.command ?? '');
       });
+    });
+  }
+
+  private renderGameOverScreen(state: GameState): void {
+    if (!state.gameOver) {
+      this.gameOverModalEl.className = 'game-over-modal hidden';
+      this.gameOverModalEl.setAttribute('aria-hidden', 'true');
+      this.gameOverModalEl.innerHTML = '';
+      return;
+    }
+
+    const strongestFaction = factionIds
+      .map((factionId) => ({ factionId, relationship: state.diplomacy[factionId].relationship }))
+      .sort((left, right) => right.relationship - left.relationship)[0];
+    const weakestFaction = factionIds
+      .map((factionId) => ({ factionId, relationship: state.diplomacy[factionId].relationship }))
+      .sort((left, right) => left.relationship - right.relationship)[0];
+    const cargoSummary =
+      Object.entries(state.player.cargo)
+        .map(([goodId, amount]) => `${goods[goodId as GoodId].name} ${amount}`)
+        .join(', ') || 'Empty hold';
+
+    this.gameOverModalEl.className = 'game-over-modal';
+    this.gameOverModalEl.setAttribute('aria-hidden', 'false');
+    this.gameOverModalEl.innerHTML = `
+      <section class="game-over-panel" role="dialog" aria-modal="true" aria-label="Game over">
+        <div class="game-over-kicker">SHIP LOG TERMINATED</div>
+        <h1>Run Failed</h1>
+        <p class="game-over-reason">${state.gameOverReason}</p>
+        <div class="game-over-grid">
+          <div class="game-over-card">
+            <span>Days Survived</span>
+            <strong>${state.player.day}</strong>
+          </div>
+          <div class="game-over-card">
+            <span>Credits</span>
+            <strong>${state.player.credits}</strong>
+          </div>
+          <div class="game-over-card">
+            <span>Portfolio</span>
+            <strong>${stockPortfolioValue(state)}</strong>
+          </div>
+          <div class="game-over-card">
+            <span>Cargo</span>
+            <strong>${cargoUsed(state)} / ${state.player.cargoCapacity}</strong>
+          </div>
+        </div>
+        <div class="game-over-report">
+          <div class="stat-row"><span>Final Location</span><strong>${currentLocation(state).name}</strong></div>
+          <div class="stat-row"><span>Remaining Supplies</span><strong>F ${state.player.supplies.food} / W ${state.player.supplies.water} / Fuel ${state.player.supplies.fuel}</strong></div>
+          <div class="stat-row"><span>Best Contact</span><strong>${factions[strongestFaction.factionId].name} ${strongestFaction.relationship}</strong></div>
+          <div class="stat-row"><span>Worst Contact</span><strong>${factions[weakestFaction.factionId].name} ${weakestFaction.relationship}</strong></div>
+          <div class="ledger-copy inventory-separator">Cargo manifest: ${cargoSummary}</div>
+        </div>
+        <p class="game-over-copy">
+          The ship goes quiet, but the ledger keeps its lesson: profit only matters if the hold still has water, fuel, and food.
+        </p>
+        <div class="game-over-actions">
+          <button class="command-button restart-button" type="button" data-command="restart">Restart Run</button>
+        </div>
+      </section>
+    `;
+
+    this.gameOverModalEl.querySelector<HTMLButtonElement>('[data-command]')?.addEventListener('click', (event) => {
+      this.onCommand((event.currentTarget as HTMLButtonElement).dataset.command ?? '');
     });
   }
 
@@ -372,13 +468,24 @@ export class ExchangeUI {
             <div class="stock-sector">${stock.sector}</div>
           </div>
         </div>
-        <div class="stock-stats">
-          <div class="stat-row"><span>Price</span><strong>${stock.price}</strong></div>
-          <div class="stat-row"><span>Move</span><strong class="${changeClass}">${change >= 0 ? '+' : ''}${change} (${formatSignedPercent(
-            changePercent
-          )})</strong></div>
-          <div class="stat-row"><span>Owned</span><strong>${position?.shares ?? 0} avg ${position?.averagePrice ?? '-'}</strong></div>
-          <div class="stat-row"><span>Value</span><strong>${stockPositionValue(state, stockId)}</strong></div>
+        <div class="stock-cell stock-price-block">
+          <span class="stock-cell-label">Price</span>
+          <strong>${stock.price}</strong>
+        </div>
+        <div class="stock-cell">
+          <span class="stock-cell-label">Move</span>
+          <strong class="${changeClass}">${change >= 0 ? '+' : ''}${change}</strong>
+          <span class="${changeClass}">${formatSignedPercent(changePercent)}</span>
+        </div>
+        <div class="stock-cell">
+          <span class="stock-cell-label">Owned</span>
+          <strong>${position?.shares ?? 0}</strong>
+          <span>avg ${position?.averagePrice ?? '-'}</span>
+        </div>
+        <div class="stock-cell">
+          <span class="stock-cell-label">Value</span>
+          <strong>${stockPositionValue(state, stockId)}</strong>
+          <span>margin</span>
         </div>
         <div class="stock-sparkline">${this.stockGraph(stock)}</div>
         <div class="stock-actions">
@@ -462,11 +569,20 @@ export class ExchangeUI {
 
   private renderCommands(state: GameState): void {
     if (state.gameOver) {
-      this.commandsEl.innerHTML = `<div class="game-over-box">GAME OVER: ${state.gameOverReason}</div>`;
+      this.commandsEl.innerHTML = `
+        <button class="command-button event-command-button" data-command="restart">
+          <span class="command-number">1</span>
+          Restart Run
+        </button>
+        <div class="game-over-box">GAME OVER: ${state.gameOverReason}</div>
+      `;
+      this.commandsEl.querySelector<HTMLButtonElement>('[data-command="restart"]')?.addEventListener('click', () => {
+        this.onCommand('restart');
+      });
       return;
     }
 
-    const buttons = state.pendingEvent ? this.eventCommands(state) : this.normalCommands(state);
+    const buttons = state.pendingEvent ? this.eventCommands(state) : this.normalCommands();
 
     this.commandsEl.innerHTML = buttons
       .map((button, index) => {
@@ -496,59 +612,7 @@ export class ExchangeUI {
     ];
   }
 
-  private normalCommands(state: GameState): { label: string; command: string }[] {
-    const vendor = currentVendor(state);
-    const commands: { label: string; command: string }[] = [
-      { label: 'Status', command: 'status' },
-      { label: 'Market', command: 'market' },
-      { label: 'Relations', command: 'relations' },
-      { label: 'View Ledger', command: 'tab ledger' },
-      { label: 'Open Bargain', command: 'tab bargain' },
-      { label: 'Stocks', command: 'tab stocks' },
-    ];
-
-    for (const stationVendor of vendorsAtLocation(state)) {
-      commands.push({
-        label: `Talk to ${stationVendor.name}`,
-        command: `vendor ${stationVendor.id}`,
-      });
-    }
-
-    for (const offer of vendor.stock) {
-      const amount = offer.kind === 'supply' ? (offer.itemId === 'fuel' ? 6 : 3) : 1;
-      commands.push({
-        label: `Buy ${itemName(offer.itemId)} x${amount}`,
-        command: `buy ${offer.itemId} ${amount}`,
-      });
-
-      if (offer.bid !== undefined) {
-        commands.push({
-          label: `Sell ${itemName(offer.itemId)} x1`,
-          command: `sell ${offer.itemId} 1`,
-        });
-      }
-    }
-
-    commands.push({ label: 'Gift 100 Credits', command: 'gift 100' });
-
-    const factionState = state.diplomacy[vendor.factionId];
-
-    if (factionState.alliance === 'none') {
-      commands.push({ label: 'Request Trade Pact', command: 'pact' });
-    } else if (factionState.alliance === 'trade_pact') {
-      commands.push({ label: 'Request Alliance', command: 'alliance' });
-    }
-
-    for (const [destinationId, fuelCost] of Object.entries(currentLocation(state).routes)) {
-      commands.push({
-        label: `Travel ${locationName(destinationId as keyof typeof locations)} (${fuelCost} fuel)`,
-        command: `travel ${destinationId}`,
-      });
-    }
-
-    commands.push({ label: 'End Turn', command: 'end' });
-    commands.push({ label: 'Clear Log', command: 'clear' });
-
-    return commands;
+  private normalCommands(): { label: string; command: string }[] {
+    return [{ label: 'Bargain', command: 'tab bargain' }];
   }
 }

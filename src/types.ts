@@ -12,7 +12,7 @@ export type FactionId =
   | 'dust_runners';
 export type AllianceStatus = 'none' | 'trade_pact' | 'alliance';
 export type FactionStance = 'ally' | 'friendly' | 'neutral' | 'rival' | 'hostile';
-export type SidebarTab = 'market' | 'ledger' | 'bargain' | 'stocks';
+export type SidebarTab = 'market' | 'ledger' | 'bargain';
 export type StockLeverage = 1 | 2 | 3;
 
 export type Good = {
@@ -144,6 +144,7 @@ export type GameState = {
   pendingEvent: PendingEvent | null;
   activeSpecial: MarketSpecial | null;
   activeSidebarTab: SidebarTab;
+  stockPopupOpen: boolean;
   selectedVendorId: string | null;
   log: string[];
 };

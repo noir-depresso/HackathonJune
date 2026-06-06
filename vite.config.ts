@@ -74,7 +74,7 @@ async function handleBargainingRequest(body: Record<string, unknown>, apiKey: st
         {
           role: 'system',
           content:
-            'You are a faction negotiator in a compact space trading game. Stay in persona, obey the game facts, and keep the reply under 90 words.',
+            'You are writing dialogue for a compact space trading game. Reply in exactly two parts. First sentence starts with "Faction Position:" and states the faction policy/ideology. Remaining sentence(s) start with the vendor name and are the individual merchant response using their role and bio. Stay in character, obey the game facts, and keep the reply under 100 words.',
         },
         {
           role: 'user',
@@ -90,7 +90,7 @@ async function handleBargainingRequest(body: Record<string, unknown>, apiKey: st
         {
           role: 'system',
           content:
-            'You are a faction negotiator. The computed bargaining result is authoritative. Do not alter the outcome, inventory, or prices. Reply in character under 110 words.',
+            'You are writing bargaining dialogue. The computed bargaining result is authoritative. Reply in exactly two parts. First sentence starts with "Faction Position:" and states the faction policy/ideology behind the decision. Remaining sentence(s) start with the vendor name and are the individual merchant response using their role and bio. Do not alter the outcome, inventory, or prices. Keep the reply under 120 words.',
         },
         {
           role: 'user',

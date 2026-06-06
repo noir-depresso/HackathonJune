@@ -53,6 +53,7 @@ export function createInitialState(): GameState {
     pendingEvent: null,
     activeSpecial: null,
     activeSidebarTab: 'market',
+    stockPopupOpen: false,
     selectedVendorId: locations.vega.vendors[0].id,
     log: [],
   };
