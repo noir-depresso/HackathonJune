@@ -573,7 +573,7 @@ app.innerHTML = `
       <div class="era-command-title">COMMAND</div>
       <form id="manual-form" class="manual-form">
         <span>&gt;</span>
-        <input id="manual-input" placeholder="type command, e.g. buy ore 1, vendor vega-vanto, gift 120" autocomplete="off" />
+        <input id="manual-input" placeholder="type command, e.g. buy ore 1, resupply water 3, vendor vega-vanto" autocomplete="off" />
       </form>
       <div id="commands" class="era-command-grid"></div>
     </footer>
@@ -2129,7 +2129,7 @@ function render(): void {
   manualInput.disabled = gameOver;
   manualInput.placeholder = gameOver
     ? 'game over'
-    : 'type command, e.g. buy ore 1, bargain, or offer 140 credits for medicine';
+    : 'type command, e.g. buy ore 1, resupply water 3, bargain, or offer 140 credits for medicine';
 }
 
 function showStatus(): void {
@@ -2163,6 +2163,36 @@ function showMarket(): void {
     .join('\n');
 
   log(`MARKET - ${vendor.name}\n${vendor.role}\n${lines}`);
+}
+
+function resupply(supplyIdText: string, amountText: string): void {
+  const supplyId = supplyIdText as SupplyId;
+  const amount = Number(amountText);
+
+  if (!supplies[supplyId] || !Number.isInteger(amount) || amount <= 0) {
+    log('Invalid resupply. Example: resupply water 3');
+    return;
+  }
+
+  const matchingVendors = vendorsAtLocation()
+    .map((vendor) => {
+      const offer = findOffer(vendor, supplyId);
+      return offer && offer.kind === 'supply'
+        ? { vendor, offer, ask: offerPrices(vendor, offer).ask }
+        : undefined;
+    })
+    .filter((entry): entry is { vendor: Vendor; offer: VendorOffer; ask: number } => Boolean(entry))
+    .sort((first, second) => first.ask - second.ask);
+
+  const bestMatch = matchingVendors[0];
+
+  if (!bestMatch) {
+    log(`${currentLocation().name} has no vendor selling ${supplies[supplyId].name}.`);
+    return;
+  }
+
+  selectedVendorId = bestMatch.vendor.id;
+  buy(supplyId, amountText);
 }
 
 function showRelations(): void {
@@ -3081,6 +3111,8 @@ function executeCommand(command: string): void {
   } else if (action === 'vendor') {
     selectVendor(parts[1] ?? '');
     return;
+  } else if (action === 'resupply') {
+    resupply(parts[1], parts[2]);
   } else if (action === 'buy') {
     buy(parts[1], parts[2]);
   } else if (action === 'sell') {
