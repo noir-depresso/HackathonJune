@@ -88,11 +88,48 @@ input {
   padding-bottom: 6px;
 }
 
+.box-subtitle {
+  margin: 4px 0 6px;
+  color: #8ff3ff;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.inventory-separator {
+  margin-top: 12px;
+}
+
+.tab-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tab-button {
+  border: 1px solid #555;
+  background: #1a1a1a;
+  color: #bbb;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.tab-button:hover,
+.active-tab {
+  border-color: #8ff3ff;
+  color: #fff;
+}
+
 .stat-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   padding: 3px 0;
+}
+
+.stat-row.danger span,
+.stat-row.danger strong {
+  color: #ff8f8f;
 }
 
 .stat-row span {
@@ -106,6 +143,80 @@ input {
 
 .muted {
   color: #888;
+}
+
+.ledger-copy,
+.vendor-role,
+.vendor-bio,
+.vendor-special-note {
+  color: #bcbcbc;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.vendor-list,
+.ledger-list {
+  display: grid;
+  gap: 8px;
+}
+
+.vendor-card,
+.ledger-card,
+.vendor-detail {
+  border: 1px solid #444;
+  background: #171717;
+  padding: 8px;
+}
+
+.vendor-card {
+  cursor: pointer;
+}
+
+.vendor-card:hover,
+.active-vendor {
+  border-color: #ffef9a;
+  background: #1d1d1d;
+}
+
+.vendor-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.vendor-head span {
+  color: #8ff3ff;
+  font-size: 12px;
+}
+
+.vendor-stock {
+  margin-top: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.vendor-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.special-badge {
+  grid-column: 1 / -1;
+  color: #ffef9a;
+  font-style: normal;
+  font-size: 11px;
+}
+
+.vendor-special-note {
+  margin-top: 8px;
+  color: #ffef9a;
+}
+
+.ledger-title {
+  color: #fff;
+  margin-bottom: 6px;
 }
 
 .era-command-area {
@@ -140,6 +251,11 @@ input {
   color: #ffffff;
 }
 
+.event-command-button {
+  border-color: #8ff3ff;
+  background: #1a2326;
+}
+
 .command-number {
   display: inline-block;
   color: #ffef9a;
@@ -169,6 +285,18 @@ input {
 
 .manual-form input:focus {
   border-color: #ffef9a;
+}
+
+.manual-form input:disabled {
+  color: #999;
+  border-color: #444;
+}
+
+.game-over-box {
+  border: 1px solid #ff8f8f;
+  background: rgba(120, 20, 20, 0.28);
+  color: #ffd4d4;
+  padding: 10px;
 }
 
 @media (max-width: 850px) {
