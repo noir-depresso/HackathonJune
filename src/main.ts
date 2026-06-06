@@ -41,6 +41,7 @@ type AllianceStatus = 'none' | 'trade_pact' | 'alliance';
 type FactionStance = 'ally' | 'friendly' | 'neutral' | 'rival' | 'hostile';
 type SidebarTab = 'market' | 'ledger' | 'bargain';
 type LogTab = 'conversation' | 'account' | 'stocks';
+type CommandMode = 'root' | 'bargainTargets';
 type StockLeverage = 1 | 2 | 3;
 
 type Good = {
@@ -496,8 +497,10 @@ let activeSpecial: MarketSpecial | null = null;
 let activeSidebarTab: SidebarTab = 'market';
 let activeLogTab: LogTab = 'conversation';
 let infoScreenOpen = false;
+let accountScreenOpen = false;
 let selectedVendorId: string | null = null;
 let stockLeverage: StockLeverage = 1;
+let commandMode: CommandMode = 'root';
 const conversationEntries: string[] = [];
 const accountEntries: string[] = [];
 const stockPositions: Partial<Record<StockId, StockPosition>> = {};
@@ -525,21 +528,11 @@ app.innerHTML = `
     <header class="era-header">
       <div>STAR TRADER</div>
       <div id="header-location"></div>
-      <div class="header-tools">
-        <button id="info-button" class="info-button" type="button" aria-label="Open information screen">i</button>
-        <span id="header-day"></span>
-      </div>
+      <div id="header-day"></div>
     </header>
 
     <main class="era-main">
-      <section class="era-log-shell">
-        <div class="log-tab-row">
-          <button id="log-tab-conversation" class="tab-button">COMMS</button>
-          <button id="log-tab-account" class="tab-button">ACCOUNT</button>
-          <button id="log-tab-stocks" class="tab-button">STOCKS</button>
-        </div>
-        <div class="era-log" id="log"></div>
-      </section>
+      <section class="era-log" id="log"></section>
 
       <aside class="era-sidebar">
         <section class="era-box">
@@ -553,11 +546,12 @@ app.innerHTML = `
         </section>
 
         <section class="era-box">
-          <h2>NETWORK</h2>
+          <h2 id="network-title">NETWORK</h2>
           <div class="tab-row">
             <button id="tab-market" class="tab-button">MARKET</button>
             <button id="tab-ledger" class="tab-button">LEDGER</button>
             <button id="tab-bargain" class="tab-button">BARGAIN</button>
+            <button id="tab-stocks" class="tab-button">STOCKS</button>
           </div>
           <div id="network-panel"></div>
         </section>
@@ -571,12 +565,19 @@ app.innerHTML = `
 
     <footer class="era-command-area">
       <div class="era-command-title">COMMAND</div>
+      <div id="commands" class="era-command-grid"></div>
       <form id="manual-form" class="manual-form">
         <span>&gt;</span>
-        <input id="manual-input" placeholder="type command, e.g. buy ore 1, resupply water 3, vendor vega-vanto" autocomplete="off" />
+        <input id="manual-input" placeholder="type command, e.g. buy ore 1, vendor nova-vessa, gift 120" autocomplete="off" />
       </form>
-      <div id="commands" class="era-command-grid"></div>
     </footer>
+  </div>
+
+  <div class="hidden-controls" aria-hidden="true">
+    <button id="info-button" type="button"></button>
+    <button id="log-tab-conversation" type="button"></button>
+    <button id="log-tab-account" type="button"></button>
+    <button id="log-tab-stocks" type="button"></button>
   </div>
 
   <section id="info-screen" class="info-screen hidden" aria-hidden="true">
@@ -639,12 +640,23 @@ app.innerHTML = `
       </div>
     </div>
   </section>
+
+  <section id="account-screen" class="info-screen hidden" aria-hidden="true">
+    <div class="info-panel account-panel" role="dialog" aria-modal="true" aria-labelledby="account-title">
+      <div class="info-panel-header">
+        <h1 id="account-title">Account Log</h1>
+        <button id="account-close" class="info-close-button" type="button" aria-label="Close account log">X</button>
+      </div>
+      <div id="account-log-body" class="info-panel-body account-log-body"></div>
+    </div>
+  </section>
 `;
 
 const logEl = document.querySelector<HTMLDivElement>('#log')!;
 const statusEl = document.querySelector<HTMLDivElement>('#status')!;
 const inventoryEl = document.querySelector<HTMLDivElement>('#inventory')!;
 const networkPanelEl = document.querySelector<HTMLDivElement>('#network-panel')!;
+const networkTitleEl = document.querySelector<HTMLHeadingElement>('#network-title')!;
 const diplomacyEl = document.querySelector<HTMLDivElement>('#diplomacy')!;
 const commandsEl = document.querySelector<HTMLDivElement>('#commands')!;
 const headerLocationEl = document.querySelector<HTMLDivElement>('#header-location')!;
@@ -654,12 +666,16 @@ const manualInput = document.querySelector<HTMLInputElement>('#manual-input')!;
 const tabMarketButton = document.querySelector<HTMLButtonElement>('#tab-market')!;
 const tabLedgerButton = document.querySelector<HTMLButtonElement>('#tab-ledger')!;
 const tabBargainButton = document.querySelector<HTMLButtonElement>('#tab-bargain')!;
+const tabStocksButton = document.querySelector<HTMLButtonElement>('#tab-stocks')!;
 const logTabConversationButton = document.querySelector<HTMLButtonElement>('#log-tab-conversation')!;
 const logTabAccountButton = document.querySelector<HTMLButtonElement>('#log-tab-account')!;
 const logTabStocksButton = document.querySelector<HTMLButtonElement>('#log-tab-stocks')!;
 const infoButton = document.querySelector<HTMLButtonElement>('#info-button')!;
 const infoCloseButton = document.querySelector<HTMLButtonElement>('#info-close')!;
 const infoScreenEl = document.querySelector<HTMLElement>('#info-screen')!;
+const accountCloseButton = document.querySelector<HTMLButtonElement>('#account-close')!;
+const accountScreenEl = document.querySelector<HTMLElement>('#account-screen')!;
+const accountLogBodyEl = document.querySelector<HTMLDivElement>('#account-log-body')!;
 
 tabMarketButton.addEventListener('click', () => {
   activeSidebarTab = 'market';
@@ -674,6 +690,12 @@ tabLedgerButton.addEventListener('click', () => {
 tabBargainButton.addEventListener('click', () => {
   bargainingState.selectedFactionId = factionToBargainFaction[currentVendor().factionId];
   activeSidebarTab = 'bargain';
+  render();
+});
+
+tabStocksButton.addEventListener('click', () => {
+  commandMode = 'root';
+  activeLogTab = 'stocks';
   render();
 });
 
@@ -709,12 +731,20 @@ infoScreenEl.addEventListener('click', (event) => {
   }
 });
 
+accountCloseButton.addEventListener('click', () => {
+  accountScreenOpen = false;
+  renderAccountScreen();
+});
+
+accountScreenEl.addEventListener('click', (event) => {
+  if (event.target === accountScreenEl) {
+    accountScreenOpen = false;
+    renderAccountScreen();
+  }
+});
+
 function currentLocation(): Location {
   return locations[player.locationId];
-}
-
-function locationName(locationId: LocationId): string {
-  return locations[locationId].name;
 }
 
 function factionName(factionId: FactionId): string {
@@ -1605,7 +1635,9 @@ function log(message: string): void {
 
 function accountLog(message: string): void {
   accountEntries.push(message);
-  renderLogPanel();
+  if (accountScreenOpen) {
+    renderAccountScreen();
+  }
 }
 
 function renderLogPanel(): void {
@@ -1746,6 +1778,16 @@ function renderInfoScreen(): void {
   infoScreenEl.setAttribute('aria-hidden', String(!infoScreenOpen));
 }
 
+function renderAccountScreen(): void {
+  accountScreenEl.className = accountScreenOpen ? 'info-screen' : 'info-screen hidden';
+  accountScreenEl.setAttribute('aria-hidden', String(!accountScreenOpen));
+  accountLogBodyEl.innerHTML =
+    accountEntries.length > 0
+      ? accountEntries.map((entry) => `<div class="log-entry">${escapeHtml(entry)}</div>`).join('')
+      : '<div class="muted">No account changes recorded yet.</div>';
+  accountLogBodyEl.scrollTop = accountLogBodyEl.scrollHeight;
+}
+
 function clearActiveLog(): void {
   if (activeLogTab === 'conversation') {
     conversationEntries.length = 0;
@@ -1769,18 +1811,13 @@ function renderStatus(): void {
   const location = currentLocation();
   const vendor = currentVendor();
   const factionState = currentFactionState();
-  const channelFaction = factionStates[bargainingState.selectedFactionId];
-  const channelMemory = factionConversationMemory[bargainingState.selectedFactionId];
 
   statusEl.innerHTML = `
     <div class="stat-row"><span>Credits</span><strong>${player.credits}</strong></div>
     <div class="stat-row"><span>Turn Income</span><strong>${incomePerTurn()}</strong></div>
     <div class="stat-row"><span>Location</span><strong>${location.name}</strong></div>
     <div class="stat-row"><span>Vendor</span><strong>${vendor.name}</strong></div>
-    <div class="stat-row"><span>Port Standing</span><strong>${factionState.relationship}</strong></div>
-    <div class="stat-row"><span>Channel</span><strong>${channelFaction.name}</strong></div>
-    <div class="stat-row"><span>Channel Standing</span><strong>${channelFaction.relationshipWithPlayer}</strong></div>
-    <div class="stat-row"><span>Channel Anger</span><strong>${channelMemory.anger} / 100</strong></div>
+    <div class="stat-row"><span>Relationship</span><strong>${factionState.relationship}</strong></div>
     <div class="stat-row"><span>Cargo</span><strong>${cargoUsed()} / ${player.cargoCapacity}</strong></div>
   `;
 }
@@ -1866,7 +1903,6 @@ function renderMarketTab(): void {
       `;
     })
     .join('');
-
   const activeVendor = currentVendor();
   const ripple = formatRipple(tradeRippleEntries(activeVendor.factionId, 2));
   const specialText =
@@ -2026,59 +2062,50 @@ function renderCommands(): void {
     return;
   }
 
-  const vendor = currentVendor();
+  if (commandMode === 'bargainTargets') {
+    const activeContact = bargainingState.dailyContact?.day === player.day ? bargainingState.dailyContact : undefined;
+    const targetButtons = (Object.keys(factionStates) as BargainFactionId[]).map((factionId) => {
+      const faction = factionStates[factionId];
+      const locked = Boolean(activeContact && activeContact.factionId !== factionId);
+      return {
+        label: `${locked ? 'LOCKED ' : ''}${faction.name}`,
+        command: `channel ${factionId}`,
+        disabled: locked,
+      };
+    });
+
+    commandsEl.innerHTML = [
+      ...targetButtons,
+      { label: 'Back', command: 'commands', disabled: false },
+    ]
+      .map((button, index) => {
+        return `
+          <button class="command-button" data-command="${button.command}" ${button.disabled ? 'disabled' : ''}>
+            <span class="command-number">${index + 1}</span>
+            ${button.label}
+          </button>
+        `;
+      })
+      .join('');
+
+    commandsEl.querySelectorAll<HTMLButtonElement>('.command-button').forEach((button) => {
+      button.addEventListener('click', () => {
+        executeCommand(button.dataset.command ?? '');
+      });
+    });
+    return;
+  }
+
   let index = 1;
   const commandButtons: { label: string; command: string }[] = [
-    { label: 'Status', command: 'status' },
-    { label: 'Market', command: 'market' },
-    { label: 'Relations', command: 'relations' },
-    { label: 'View Ledger', command: 'tab ledger' },
-    { label: 'Bargain AI', command: 'bargain' },
-    { label: 'Stock Market', command: 'stocks' },
-    { label: `Leverage ${stockLeverage === 3 ? 1 : stockLeverage + 1}x`, command: `leverage ${stockLeverage === 3 ? 1 : stockLeverage + 1}` },
+    { label: 'STATUS', command: 'status' },
+    { label: 'BARGAIN', command: 'bargain' },
+    { label: 'STOCK', command: 'stocks' },
+    { label: 'RELATIONS', command: 'relations' },
+    { label: 'END TURN', command: 'end' },
+    { label: 'CLEAR LOG', command: 'clear' },
+    { label: 'ACCOUNT', command: 'account' },
   ];
-
-  for (const stationVendor of vendorsAtLocation()) {
-    commandButtons.push({
-      label: `Talk to ${stationVendor.name}`,
-      command: `vendor ${stationVendor.id}`,
-    });
-  }
-
-  for (const offer of vendor.stock) {
-    const amount = offer.kind === 'supply' ? (offer.itemId === 'fuel' ? 6 : 3) : 1;
-    commandButtons.push({
-      label: `Buy ${itemName(offer.itemId)} x${amount}`,
-      command: `buy ${offer.itemId} ${amount}`,
-    });
-
-    if (offer.bid !== undefined) {
-      commandButtons.push({
-        label: `Sell ${itemName(offer.itemId)} x1`,
-        command: `sell ${offer.itemId} 1`,
-      });
-    }
-  }
-
-  commandButtons.push({ label: 'Gift 100 Credits', command: 'gift 100' });
-
-  const state = diplomacy[vendor.factionId];
-
-  if (state.alliance === 'none') {
-    commandButtons.push({ label: 'Request Trade Pact', command: 'pact' });
-  } else if (state.alliance === 'trade_pact') {
-    commandButtons.push({ label: 'Request Alliance', command: 'alliance' });
-  }
-
-  for (const [destinationId, fuelCost] of Object.entries(currentLocation().routes)) {
-    commandButtons.push({
-      label: `Travel ${locationName(destinationId as LocationId)} (${fuelCost} fuel)`,
-      command: `travel ${destinationId}`,
-    });
-  }
-
-  commandButtons.push({ label: 'End Turn', command: 'end' });
-  commandButtons.push({ label: 'Clear Log', command: 'clear' });
 
   commandsEl.innerHTML = commandButtons
     .map((button) => {
@@ -2109,6 +2136,8 @@ function render(): void {
   tabMarketButton.className = activeSidebarTab === 'market' ? 'tab-button active-tab' : 'tab-button';
   tabLedgerButton.className = activeSidebarTab === 'ledger' ? 'tab-button active-tab' : 'tab-button';
   tabBargainButton.className = activeSidebarTab === 'bargain' ? 'tab-button active-tab' : 'tab-button';
+  tabStocksButton.className = activeLogTab === 'stocks' ? 'tab-button active-tab' : 'tab-button';
+  networkTitleEl.textContent = 'NETWORK';
 
   renderStatus();
   renderInventory();
@@ -2129,7 +2158,7 @@ function render(): void {
   manualInput.disabled = gameOver;
   manualInput.placeholder = gameOver
     ? 'game over'
-    : 'type command, e.g. buy ore 1, resupply water 3, bargain, or offer 140 credits for medicine';
+    : 'type command, e.g. buy ore 1, vendor nova-vessa, gift 120';
 }
 
 function showStatus(): void {
@@ -2207,27 +2236,6 @@ Tier: ${relationshipTier(state.relationship)}
 Alliance: ${allianceLabel(state.alliance)}
 Trade ripple: ${ripple}`
   );
-}
-
-function showBargainingHelp(): void {
-  activeSidebarTab = 'bargain';
-  bargainingState.selectedFactionId = factionToBargainFaction[currentVendor().factionId];
-
-  const factionsList = Object.values(factionStates)
-    .map((faction) => `${faction.name}: ${faction.ideology}`)
-    .join('\n');
-
-  log(`BARGAINING CHANNEL
-Use the Network > Bargain tab, or type a natural offer.
-Accepted deals only apply after Confirm Deal.
-
-Examples:
-I offer Vega 140 credits for 1 medicine as humanitarian aid.
-offer eclipse credits 500 for alien_relics 1
-what do you need?
-
-Known civilization channels:
-${factionsList}`);
 }
 
 async function submitBargainingOffer(offer: NegotiationOffer): Promise<void> {
@@ -3071,6 +3079,22 @@ function addressedBargainFaction(command: string): BargainFactionId | undefined 
   })?.[1];
 }
 
+function selectBargainChannel(factionId: BargainFactionId): void {
+  if (!registerBargainingContact(factionId)) {
+    commandMode = 'bargainTargets';
+    activeSidebarTab = 'bargain';
+    return;
+  }
+
+  bargainingState.selectedFactionId = factionId;
+  bargainingState.pendingOffer = undefined;
+  bargainingState.pendingResult = undefined;
+  bargainingState.message = `Channel open: ${factionStates[factionId].name}.`;
+  activeSidebarTab = 'bargain';
+  commandMode = 'root';
+  log(`BARGAIN CHANNEL\nOpened ${factionStates[factionId].name}.`);
+}
+
 function executeCommand(command: string): void {
   if (gameOver) return;
 
@@ -3081,51 +3105,82 @@ function executeCommand(command: string): void {
 
   if (!action) return;
 
-  if (action !== 'clear') {
+  if (!['clear', 'account', 'commands'].includes(action)) {
     log(`> ${command}`);
   }
 
-  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'stocks', 'stock', 'leverage', 'tab'].includes(action)) {
+  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'stocks', 'stock', 'leverage', 'tab', 'account'].includes(action)) {
     resolvePendingEvent(normalizedCommand);
     render();
     return;
   }
 
   if (action === 'status') {
+    commandMode = 'root';
     showStatus();
   } else if (action === 'market') {
+    commandMode = 'root';
     activeSidebarTab = 'market';
     showMarket();
   } else if (action === 'relations') {
+    commandMode = 'root';
     showRelations();
   } else if (action === 'ledger') {
+    commandMode = 'root';
     activeSidebarTab = 'ledger';
     showLedger();
+  } else if (action === 'comms') {
+    commandMode = 'root';
+    activeLogTab = 'conversation';
+  } else if (action === 'account') {
+    commandMode = 'root';
+    accountScreenOpen = true;
+    renderAccountScreen();
   } else if (action === 'stocks') {
+    commandMode = 'root';
     activeLogTab = 'stocks';
   } else if (action === 'tab') {
+    commandMode = 'root';
     if (parts[1] === 'ledger') activeSidebarTab = 'ledger';
     if (parts[1] === 'market') activeSidebarTab = 'market';
     if (parts[1] === 'bargain') activeSidebarTab = 'bargain';
     if (parts[1] === 'stocks') activeLogTab = 'stocks';
+  } else if (action === 'commands') {
+    commandMode = 'root';
+  } else if (action === 'channel') {
+    const factionId = parts[1] as BargainFactionId;
+    if (factionStates[factionId]) {
+      selectBargainChannel(factionId);
+    } else {
+      log('Unknown bargain channel.');
+    }
   } else if (action === 'vendor') {
+    commandMode = 'root';
     selectVendor(parts[1] ?? '');
     return;
   } else if (action === 'resupply') {
+    commandMode = 'root';
     resupply(parts[1], parts[2]);
   } else if (action === 'buy') {
+    commandMode = 'root';
     buy(parts[1], parts[2]);
   } else if (action === 'sell') {
+    commandMode = 'root';
     sell(parts[1], parts[2]);
   } else if (action === 'gift') {
+    commandMode = 'root';
     gift(parts[1]);
   } else if (action === 'pact') {
+    commandMode = 'root';
     requestTradePact();
   } else if (action === 'alliance') {
+    commandMode = 'root';
     requestAlliance();
   } else if (action === 'travel') {
+    commandMode = 'root';
     travel(parts[1]);
   } else if (action === 'stock') {
+    commandMode = 'root';
     if (parts[1] === 'buy') {
       buyStock(parts[2], parts[3]);
     } else if (parts[1] === 'sell') {
@@ -3134,20 +3189,28 @@ function executeCommand(command: string): void {
       log('Invalid stock command. Use: stock buy vega_credit 1 or stock sell vega_credit 1.');
     }
   } else if (action === 'leverage') {
+    commandMode = 'root';
     setStockLeverage(parts[1]);
   } else if (action === 'bargain') {
-    showBargainingHelp();
+    commandMode = 'bargainTargets';
+    activeSidebarTab = 'bargain';
+    bargainingState.message = 'Select one faction channel. Other channels lock after contact until the next day.';
   } else if (action === 'offer' || action === 'negotiate' || action === 'trade') {
+    commandMode = 'root';
     void submitFreeformBargainingMessage(command);
   } else if (action === 'end') {
+    commandMode = 'root';
     endTurn();
   } else if (action === 'clear') {
+    commandMode = 'root';
     clearActiveLog();
   } else if (addressedFaction) {
+    commandMode = 'root';
     bargainingState.selectedFactionId = addressedFaction;
     activeSidebarTab = 'bargain';
     void submitFreeformBargainingMessage(command);
   } else if (activeSidebarTab === 'bargain') {
+    commandMode = 'root';
     void submitFreeformBargainingMessage(command);
   } else {
     log(`Unknown command: ${command}`);
@@ -3169,6 +3232,11 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && infoScreenOpen) {
     infoScreenOpen = false;
     renderInfoScreen();
+  }
+
+  if (event.key === 'Escape' && accountScreenOpen) {
+    accountScreenOpen = false;
+    renderAccountScreen();
   }
 });
 
