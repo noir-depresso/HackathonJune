@@ -1,0 +1,42 @@
+{
+  "credits": {
+    "name": "Credits",
+    "baseValue": 1,
+    "category": "currency"
+  },
+  "food": {
+    "name": "Food",
+    "baseValue": 10,
+    "category": "survival"
+  },
+  "water": {
+    "name": "Water",
+    "baseValue": 12,
+    "category": "survival"
+  },
+  "fuel": {
+    "name": "Fuel",
+    "baseValue": 50,
+    "category": "fuel"
+  },
+  "medicine": {
+    "name": "Medicine",
+    "baseValue": 95,
+    "category": "survival"
+  },
+  "ore": {
+    "name": "Ore",
+    "baseValue": 35,
+    "category": "industry"
+  },
+  "star_silk": {
+    "name": "Star Silk",
+    "baseValue": 210,
+    "category": "luxury"
+  },
+  "alien_relics": {
+    "name": "Alien Relics",
+    "baseValue": 500,
+    "category": "rare"
+  }
+}

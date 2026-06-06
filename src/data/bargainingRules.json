@@ -1,0 +1,12 @@
+{
+  "acceptThreshold": 10,
+  "counterofferThreshold": -35,
+  "relationshipMultiplier": 1.5,
+  "trustMultiplier": 0.2,
+  "urgentNeedMultiplier": 1.6,
+  "likedResourceMultiplier": 1.3,
+  "dislikedResourceMultiplier": 0.6,
+  "tabooPenalty": 9999,
+  "maxCounterofferMultiplier": 1.8,
+  "minCounterofferMultiplier": 1.15
+}

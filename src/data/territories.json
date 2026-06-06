@@ -1,0 +1,41 @@
+{
+  "sirius_ore_belt": {
+    "name": "Sirius Ore Belt",
+    "owner": "sirius_guild",
+    "type": "mining",
+    "basePrice": 600,
+    "resourceOutput": {
+      "ore": 20,
+      "fuel": 5
+    },
+    "strategicValue": 80,
+    "isForSale": true,
+    "leaseAllowed": true
+  },
+  "vega_fuel_depots": {
+    "name": "Vega Fuel Depots",
+    "owner": "vega_exchange",
+    "type": "logistics",
+    "basePrice": 450,
+    "resourceOutput": {
+      "fuel": 12,
+      "medicine": 3
+    },
+    "strategicValue": 50,
+    "isForSale": true,
+    "leaseAllowed": true
+  },
+  "nova_water_wells": {
+    "name": "Nova Water Wells",
+    "owner": "nova_relief",
+    "type": "water",
+    "basePrice": 520,
+    "resourceOutput": {
+      "water": 30,
+      "food": 8
+    },
+    "strategicValue": 70,
+    "isForSale": false,
+    "leaseAllowed": true
+  }
+}

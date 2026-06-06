@@ -101,7 +101,7 @@ input {
 
 .tab-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-bottom: 10px;
 }
@@ -217,6 +217,200 @@ input {
 .ledger-title {
   color: #fff;
   margin-bottom: 6px;
+}
+
+.bargaining-form {
+  display: grid;
+  gap: 8px;
+}
+
+.bargaining-form label,
+.bargain-grid label {
+  display: grid;
+  gap: 4px;
+  color: #8ff3ff;
+  font-size: 12px;
+}
+
+.bargaining-form select,
+.bargaining-form input {
+  width: 100%;
+  border: 1px solid #555;
+  background: #080808;
+  color: #ffffff;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.bargaining-form select:focus,
+.bargaining-form input:focus {
+  border-color: #ffef9a;
+}
+
+.bargain-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 8px;
+}
+
+.bargain-submit {
+  text-align: center;
+}
+
+.bargain-inventory {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.bargain-inventory > div,
+.bargain-message {
+  border: 1px solid #444;
+  background: #171717;
+  padding: 8px;
+  color: #d8d8d8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bargain-message {
+  margin-top: 10px;
+  color: #ffef9a;
+}
+
+.bargain-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.stock-summary {
+  border: 1px solid #444;
+  background: #080808;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.leverage-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.stock-board {
+  display: grid;
+  gap: 8px;
+}
+
+.stock-card {
+  border: 1px solid #444;
+  background: #111;
+  padding: 8px;
+}
+
+.stock-card:hover {
+  border-color: #777;
+  background: #171717;
+}
+
+.stock-identity {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 9px;
+  align-items: center;
+}
+
+.stock-symbol {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  border: 1px solid #555;
+  background: #080808;
+  color: #ffef9a;
+  font-size: 16px;
+}
+
+.stock-name {
+  color: #ffffff;
+}
+
+.stock-sector {
+  color: #999;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.stock-stats {
+  margin-top: 8px;
+}
+
+.stock-up {
+  color: #73ff9a;
+}
+
+.stock-down {
+  color: #ff7f7f;
+}
+
+.stock-sparkline {
+  margin-top: 8px;
+}
+
+.stock-graph {
+  width: 100%;
+  height: 44px;
+  border: 1px solid #303030;
+  background: #080808;
+}
+
+.stock-graph polyline {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.stock-graph-midline {
+  stroke: #242424;
+  stroke-width: 1;
+}
+
+.stock-line-up {
+  stroke: #39ff77;
+}
+
+.stock-line-down {
+  stroke: #ff4f61;
+}
+
+.stock-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.stock-trade-button {
+  min-height: 30px;
+  border: 1px solid #555;
+  background: #181818;
+  color: #eeeeee;
+  cursor: pointer;
+  padding: 4px 5px;
+}
+
+.stock-trade-button span {
+  display: block;
+  color: #999;
+  font-size: 11px;
+}
+
+.buy-button {
+  border-color: #3a7d52;
+}
+
+.sell-button {
+  border-color: #7d3a3a;
 }
 
 .era-command-area {

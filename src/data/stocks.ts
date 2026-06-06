@@ -1,0 +1,61 @@
+import type { Stock, StockId } from '../types';
+
+export const initialStocks: Record<StockId, Stock> = {
+  vega_credit: {
+    id: 'vega_credit',
+    symbol: 'VCI',
+    name: 'Vega Credit Index',
+    sector: 'Banking and licensed trade',
+    basePrice: 86,
+    price: 86,
+    drift: 0.004,
+    volatility: 0.035,
+    history: [86],
+  },
+  sirius_ore: {
+    id: 'sirius_ore',
+    symbol: 'SOT',
+    name: 'Sirius Ore Trust',
+    sector: 'Mining and refinery contracts',
+    basePrice: 134,
+    price: 134,
+    drift: 0.003,
+    volatility: 0.045,
+    history: [134],
+  },
+  nova_life: {
+    id: 'nova_life',
+    symbol: 'NLF',
+    name: 'Nova Lifeline Fund',
+    sector: 'Medicine, food, and water logistics',
+    basePrice: 62,
+    price: 62,
+    drift: 0.002,
+    volatility: 0.032,
+    history: [62],
+  },
+  caravan_lux: {
+    id: 'caravan_lux',
+    symbol: 'CLX',
+    name: 'Caravan Luxuries',
+    sector: 'Star silk and rare goods',
+    basePrice: 218,
+    price: 218,
+    drift: 0.003,
+    volatility: 0.052,
+    history: [218],
+  },
+  dust_salvage: {
+    id: 'dust_salvage',
+    symbol: 'DSP',
+    name: 'Dust Salvage Pool',
+    sector: 'Scrap, salvage, and black-route risk',
+    basePrice: 41,
+    price: 41,
+    drift: 0.001,
+    volatility: 0.06,
+    history: [41],
+  },
+};
+
+export const stockIds = Object.keys(initialStocks) as StockId[];
