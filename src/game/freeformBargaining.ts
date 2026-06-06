@@ -81,6 +81,9 @@ Use this exact shape:
   "missingInfo": []
 }
 Never decide acceptance. Game logic decides the outcome.
+Important orientation rule: "offered" is what the PLAYER gives away. "requested" is what the PLAYER wants to receive from the faction.
+For "I offer/pay/give/trade 100 credits for 10 fuel", offered={"credits":100}, requested={"fuel_cells":10}.
+For "I want to buy/get/acquire 10 fuel for 100 credits", offered={"credits":100}, requested={"fuel_cells":10}.
 If a player writes a bare number before "for", treat it as credits offered.
 If a player writes "fuel", treat it as fuel_cells.
 Common typos like "ofer" still mean "offer".`;
@@ -136,6 +139,19 @@ export const structuredBargainingExamples: StructuredBargainingIntent[] = [
     proposalFrame: 'unclear',
     claims: [],
     confidence: 0.8,
+    missingInfo: [],
+  },
+  {
+    intent: 'trade_offer',
+    toFaction: 'nova_frontier',
+    offered: { credits: 100 },
+    requested: { fuel_cells: 10 },
+    tone: 'diplomatic',
+    politicalStance: 'neutral',
+    philosophyAppeal: 'profit',
+    proposalFrame: 'unclear',
+    claims: [],
+    confidence: 0.86,
     missingInfo: [],
   },
 ];
@@ -449,7 +465,17 @@ function extractTradeSideText(message: string, side: 'offer' | 'request'): strin
   if (forSplit) {
     const left = cleanTradePhrase(forSplit[1]);
     const right = cleanTradePhrase(forSplit[2]);
-    return side === 'offer' ? left : right;
+    const hasExplicitOfferVerb = /\b(offer|pay|give|trade|send|provide)\b/i.test(forSplit[1]);
+    const acquisitionFrame =
+      !hasExplicitOfferVerb &&
+      /\b(buy|purchase|get|acquire|receive|take|want|need|request|ask for)\b/i.test(forSplit[1]);
+    return side === 'offer'
+      ? acquisitionFrame
+        ? right
+        : left
+      : acquisitionFrame
+        ? left
+        : right;
   }
 
   const pattern =
@@ -560,7 +586,7 @@ function resourceAliases(resourceId: ResourceId): string[] {
   const customAliases: Partial<Record<ResourceId, string[]>> = {
     credits: ['credits?', 'credit chips?', 'cr', 'cash', 'money'],
     medicine: ['medicine', 'meds?', 'medical supplies'],
-    fuel_cells: ['fuel[ _-]cells?', 'fuel', 'cells?'],
+    fuel_cells: ['fuel[ _-]cells?', 'fuels?', 'cells?'],
     alien_relics: ['alien[ _-]relics?', 'relics?', 'artifacts?'],
     star_silk: ['star[ _-]silk', 'silk'],
   };

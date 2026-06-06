@@ -5,7 +5,8 @@ import {
   generateFactionChatMessage,
   requestStructuredBargainingIntent,
 } from './game/bargainingAI';
-import { formatBundle, generateDialogue } from './game/dialogue';
+import type { FactionConversationMemory } from './game/bargainingAI';
+import { formatBundle, formatResourceName, generateDialogue } from './game/dialogue';
 import { evaluateStructuredBargain } from './game/freeformBargaining';
 import { evaluateOffer } from './game/negotiation';
 import { relationshipDeltaAfterTrade } from './game/relationships';
@@ -499,6 +500,11 @@ let stockLeverage: StockLeverage = 1;
 const conversationEntries: string[] = [];
 const accountEntries: string[] = [];
 const stockPositions: Partial<Record<StockId, StockPosition>> = {};
+const factionConversationMemory: Record<BargainFactionId, FactionConversationMemory> = {
+  vega_union: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0 },
+  eclipse_combine: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0 },
+  nova_frontier: { recent: [], mood: 'new contact', repeatedTopic: '', repeatCount: 0 },
+};
 const stockMarketBias: Record<StockId, number> = {
   vega_credit: 0,
   sirius_ore: 0,
@@ -1723,6 +1729,21 @@ function formatCargoChange(before: Partial<Record<GoodId, number>>): string {
     .join(', ');
 }
 
+function formatResourceBundleChange(
+  before: Partial<Record<ResourceId, number>>,
+  after: Partial<Record<ResourceId, number>>
+): string {
+  const resourceIds = new Set<ResourceId>([
+    ...(Object.keys(before) as ResourceId[]),
+    ...(Object.keys(after) as ResourceId[]),
+  ]);
+  const changes = [...resourceIds]
+    .filter((resourceId) => (before[resourceId] ?? 0) !== (after[resourceId] ?? 0))
+    .map((resourceId) => `${formatResourceName(resourceId)} ${before[resourceId] ?? 0} -> ${after[resourceId] ?? 0}`);
+
+  return changes.length > 0 ? changes.join(', ') : 'no resource changes';
+}
+
 function renderMarketTab(): void {
   const vendorCards = vendorsAtLocation()
     .map((vendor) => {
@@ -2156,10 +2177,12 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
           playerInventory: bargainingPlayerInventory(),
           factionInventory: faction.inventory as ResourceBundle,
           lastBargainingMessage: bargainingState.message,
+          memory: factionConversationMemory[structured.toFaction],
         });
 
     bargainingState.message = responseMessage;
     log(responseMessage);
+    rememberFactionExchange(structured.toFaction, message, responseMessage);
     render();
     return;
   }
@@ -2181,6 +2204,7 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
 
   bargainingState.message = aiMessage;
   log(aiMessage);
+  rememberFactionExchange(structured.toFaction, message, aiMessage);
 
   if (freeformResult.computedResult.outcome === 'accept' && freeformResult.offer) {
     applyBargainingTrade(freeformResult.offer, freeformResult.computedResult);
@@ -2214,6 +2238,56 @@ function factionProfileSnapshot(): Record<BargainFactionId, unknown> {
     };
     return snapshot;
   }, {} as Record<BargainFactionId, unknown>);
+}
+
+function rememberFactionExchange(factionId: BargainFactionId, playerMessage: string, factionMessage: string): void {
+  const memory = factionConversationMemory[factionId];
+  const topic = conversationTopic(playerMessage);
+
+  if (topic === memory.repeatedTopic) {
+    memory.repeatCount += 1;
+  } else {
+    memory.repeatedTopic = topic;
+    memory.repeatCount = 1;
+  }
+
+  memory.recent.push({ player: playerMessage, faction: factionMessage });
+
+  if (memory.recent.length > 6) {
+    memory.recent.shift();
+  }
+
+  memory.mood = summarizeFactionMood(factionId, memory.repeatCount);
+}
+
+function conversationTopic(message: string): string {
+  const normalized = message.toLowerCase().trim();
+
+  if (/^(h|g)?ello\b|^hi\b|^hey\b|greetings/.test(normalized)) return 'greeting';
+  if (/how.*(day|doing)|how are you|what.*up|how goes/.test(normalized)) return 'small talk';
+  if (/trust|faith|believe|good deal|fair deal|honou?r/.test(normalized)) return 'trust';
+  if (/thank|thanks|appreciate|respect|great|kind/.test(normalized)) return 'respect';
+  if (/\b\d+\b/.test(normalized)) return 'proposal';
+  return normalized.split(/\s+/).slice(0, 4).join(' ') || 'open channel';
+}
+
+function summarizeFactionMood(factionId: BargainFactionId, repeatCount: number): string {
+  const faction = factionStates[factionId];
+  const patience =
+    faction.trust >= 60
+      ? 'patient'
+      : faction.trust <= 25
+        ? 'impatient'
+        : 'measured';
+  const relation =
+    faction.relationshipWithPlayer >= 35
+      ? 'warm'
+      : faction.relationshipWithPlayer < -10
+        ? 'suspicious'
+        : 'guarded';
+  const repetition = repeatCount >= 3 ? 'noticing repeated phrasing' : 'following the conversation';
+
+  return `${patience}, ${relation}, ${repetition}`;
 }
 
 function confirmPendingOffer(): void {
@@ -2288,7 +2362,7 @@ function applyBargainingTrade(offer: NegotiationOffer, result: NegotiationResult
   bargainingState.message = message;
   log(message);
   accountLog(
-    `BARGAIN | ${faction.name}. ${formatBundle(offer.offered)} for ${formatBundle(offer.requested)}. Credits ${beforeCredits} -> ${player.credits}. Supplies ${beforeSupplies.food}/${beforeSupplies.water}/${beforeSupplies.fuel} -> ${player.supplies.food}/${player.supplies.water}/${player.supplies.fuel}. Cargo ${beforeCargo} -> ${cargoUsed()}. ${faction.name} stores ${formatBundle(beforeFactionInventory)} -> ${formatBundle(faction.inventory as ResourceBundle)}.`
+    `BARGAIN | ${faction.name}. Terms: player gave ${formatBundle(offer.offered)}; player received ${formatBundle(offer.requested)}. Player account: credits ${beforeCredits} -> ${player.credits}; supplies food/water/fuel ${beforeSupplies.food}/${beforeSupplies.water}/${beforeSupplies.fuel} -> ${player.supplies.food}/${player.supplies.water}/${player.supplies.fuel}; cargo slots ${beforeCargo} -> ${cargoUsed()}. ${faction.name} account: ${formatResourceBundleChange(beforeFactionInventory, faction.inventory as ResourceBundle)}.`
   );
   render();
 }
@@ -2583,12 +2657,21 @@ function showLedger(): void {
   log(`UNIVERSE LEDGER\n${lines}`);
 }
 
+function addressedBargainFaction(command: string): BargainFactionId | undefined {
+  const normalized = command.toLowerCase();
+
+  return Object.entries(factionAliases).find(([alias]) => {
+    return normalized.includes(alias.replaceAll('_', ' ')) || normalized.includes(alias);
+  })?.[1];
+}
+
 function executeCommand(command: string): void {
   if (gameOver) return;
 
   const normalizedCommand = command.trim().toLowerCase();
   const parts = normalizedCommand.split(/\s+/);
   const action = parts[0];
+  const addressedFaction = addressedBargainFaction(command);
 
   if (!action) return;
 
@@ -2652,6 +2735,10 @@ function executeCommand(command: string): void {
     endTurn();
   } else if (action === 'clear') {
     clearActiveLog();
+  } else if (addressedFaction) {
+    bargainingState.selectedFactionId = addressedFaction;
+    activeSidebarTab = 'bargain';
+    void submitFreeformBargainingMessage(command);
   } else if (activeSidebarTab === 'bargain') {
     void submitFreeformBargainingMessage(command);
   } else {

@@ -46,7 +46,7 @@ function formatCounteroffer(offered: ResourceBundle | undefined, requested: Reso
   return `${formatBundle(offered)} for ${formatBundle(requested)}`;
 }
 
-function formatResourceName(resourceId: ResourceId | undefined): string {
+export function formatResourceName(resourceId: ResourceId | undefined): string {
   if (!resourceId) {
     return 'that resource';
   }
