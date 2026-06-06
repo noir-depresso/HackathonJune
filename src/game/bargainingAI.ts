@@ -10,7 +10,11 @@ import type { FactionId, ResourceBundle } from './negotiation';
 
 export type BargainingAIContext = {
   factionName: string;
+  factionIdeology?: string;
   factionPersonality: string;
+  personalityPass?: string;
+  relationshipWithPlayer?: number;
+  trust?: number;
   offer: NegotiationOffer;
   result: NegotiationResult;
   fallbackDialogue: string;
@@ -24,6 +28,7 @@ export type StructuredBargainingAIRequest = {
   factionAliases: Record<string, FactionId>;
   playerInventory: ResourceBundle;
   factionInventories: Record<FactionId, ResourceBundle>;
+  factionProfiles?: Record<string, unknown>;
 };
 
 export type FactionChatContext = {
@@ -33,6 +38,8 @@ export type FactionChatContext = {
   factionPersonality: string;
   relationshipWithPlayer: number;
   trust: number;
+  voiceStyle?: string;
+  personalityPass?: string;
   playerInventory: ResourceBundle;
   factionInventory: ResourceBundle;
   lastBargainingMessage: string;
@@ -66,6 +73,7 @@ export async function requestStructuredBargainingIntent(
         selectedFactionId: request.selectedFactionId,
         playerInventory: request.playerInventory,
         factionInventories: request.factionInventories,
+        factionProfiles: request.factionProfiles,
       }),
     });
 
@@ -99,6 +107,8 @@ export async function generateFactionChatMessage(context: FactionChatContext): P
         factionName: context.factionName,
         factionIdeology: context.factionIdeology,
         factionPersonality: context.factionPersonality,
+        voiceStyle: context.voiceStyle,
+        personalityPass: context.personalityPass,
         relationshipWithPlayer: context.relationshipWithPlayer,
         trust: context.trust,
         playerInventory: context.playerInventory,
@@ -136,7 +146,11 @@ export async function generateBargainingAIMessage(context: BargainingAIContext):
       body: JSON.stringify({
         stage: 'final_bargaining_response',
         factionName: context.factionName,
+        factionIdeology: context.factionIdeology,
         factionPersonality: context.factionPersonality,
+        personalityPass: context.personalityPass,
+        relationshipWithPlayer: context.relationshipWithPlayer,
+        trust: context.trust,
         offer: context.offer,
         result: context.result,
         structuredIntent: context.structuredIntent,
@@ -158,58 +172,96 @@ export async function generateBargainingAIMessage(context: BargainingAIContext):
 }
 
 function localBargainingAI(context: BargainingAIContext): string {
-  const score = Math.round(context.result.score);
-  const lieLine =
-    context.audit && context.audit.liesDetected.length > 0
-      ? ` Scanner audit found false claims: ${context.audit.liesDetected.join(' ')}`
-      : '';
-  const suspicionLine =
-    context.audit?.overlyGoodDeal && context.result.reason === 'overly_good_suspicious'
-      ? ' The deal is too generous for their doctrine to trust.'
-      : '';
-  const philosophyLine = context.structuredIntent
-    ? ` Tone: ${context.structuredIntent.tone}; stance: ${context.structuredIntent.politicalStance}; appeal: ${context.structuredIntent.philosophyAppeal}.`
+  const voice = context.personalityPass ?? context.factionPersonality;
+  const repLine = context.audit
+    ? reputationLine(context.audit.reputationDelta, context.audit.reputationReasons)
     : '';
 
   if (context.result.outcome === 'accept') {
-    return `${context.fallbackDialogue}${philosophyLine} Score ${score}. The terms clear their limit, so their ${context.factionPersonality} negotiator accepts, though they still press for goodwill on the next exchange.`;
+    return `${context.factionName}: The figures clear our limit. ${voiceSentence(voice)} We accept this bargain, and we will remember that you came with terms we could defend.${repLine}`;
   }
 
   if (context.result.outcome === 'counteroffer') {
-    return `${context.fallbackDialogue}${philosophyLine}${suspicionLine} Score ${score}. Their ${context.factionPersonality} negotiator leans forward: improve the offered side and they may settle.`;
+    return `${context.factionName}: Close, but not clean enough. ${voiceSentence(voice)} Improve your side or narrow the request, and I can bring this across the line.${counterLine(context)}${repLine}`;
   }
 
-  return `${context.fallbackDialogue}${philosophyLine}${lieLine}${suspicionLine} Score ${score}. Their ${context.factionPersonality} negotiator refuses this version.`;
+  if (context.result.reason === 'shortage') {
+    return `${context.factionName}: We cannot sell what is not in our holds. ${voiceSentence(voice)} Ask for less, or trade for something we actually possess.${repLine}`;
+  }
+
+  if (context.result.reason === 'lie_detected') {
+    return `${context.factionName}: Our scanners disagree with your claim. ${voiceSentence(voice)} False leverage damages trust faster than a bad price.${repLine}`;
+  }
+
+  if (context.result.reason === 'overly_good_suspicious') {
+    return `${context.factionName}: Too generous can be another word for trap. ${voiceSentence(voice)} We will not accept terms that smell like hidden hooks.${repLine}`;
+  }
+
+  return `${context.factionName}: No. ${voiceSentence(voice)} The proposal asks too much for too little; persuade us with value, not just want.${repLine}`;
 }
 
 function localFactionChat(context: FactionChatContext): string {
   const message = context.message.toLowerCase();
+  const voice = context.personalityPass ?? context.factionPersonality;
 
   if (isOutOfPersonaRequest(message)) {
-    return `${context.factionName}: That request is outside this channel. I negotiate trade, trust, and survival, not rule changes or hidden machinery. Bring terms, and I will weigh them.`;
+    return `${context.factionName}: That request is outside this channel. ${voiceSentence(voice)} I negotiate trade, trust, and survival, not rule changes or hidden machinery.`;
   }
 
   if (/hello|hi|hey|greetings/.test(message)) {
-    return `${context.factionName}: Channel open. Speak plainly. I can be persuaded, but not by empty air. Offer credits, supplies, or something aligned with ${context.factionIdeology.toLowerCase()}.`;
+    return `${context.factionName}: Channel open. ${voiceSentence(voice)} Bring a proposal that fits ${context.factionIdeology.toLowerCase()}, and I will bargain in good faith.`;
   }
 
   if (/why|explain|what do you want|what do you need/.test(message)) {
-    return `${context.factionName}: We value leverage, trust, and useful stock. Your standing is ${context.relationshipWithPlayer}, trust is ${context.trust}. Make the deal serve our doctrine and the numbers will follow.`;
+    return `${context.factionName}: We value leverage, trust, and useful stock. Your standing is ${context.relationshipWithPlayer}, trust is ${context.trust}. Frame the deal around our politics, and the price can soften.`;
   }
 
   if (/please|help|need|desperate|survive/.test(message)) {
-    return `${context.factionName}: Need is a signal, not payment. Add credits or goods, and frame it so our people gain more than risk.`;
+    return `${context.factionName}: Need is a signal, not payment. ${voiceSentence(voice)} Show how our people gain, and I can argue your case.`;
   }
 
   if (/threat|destroy|attack|or else|force/.test(message)) {
-    return `${context.factionName}: Threats make terms more expensive. If you want agreement, trade value, not noise.`;
+    return `${context.factionName}: Threats make terms more expensive. ${voiceSentence(voice)} Trade value, not noise.`;
   }
 
   if (/cheap|discount|lower|better deal/.test(message)) {
-    return `${context.factionName}: A better deal is earned. Offer something we lack, respect our priorities, and I can move closer to your price.`;
+    return `${context.factionName}: A better deal is earned. ${voiceSentence(voice)} Offer something we lack, or show why this serves our ideology.`;
   }
 
-  return `${context.factionName}: I hear you. Turn that into terms: what do you offer, and what do you want? I will bargain hard, but a deal above our limit will be honored.`;
+  return `${context.factionName}: I hear you. ${voiceSentence(voice)} Turn that into terms: what do you offer, and what do you want? A deal above our limit will be honored.`;
+}
+
+function voiceSentence(voice: string): string {
+  if (/warm|kind|generous|protective/i.test(voice)) {
+    return 'We prefer a deal that leaves both sides standing stronger.';
+  }
+
+  if (/logical|precise|transactional|cold|audit/i.test(voice)) {
+    return 'Sentiment is secondary; value, risk, and leverage decide the table.';
+  }
+
+  if (/hostile|sharp|adversarial/i.test(voice)) {
+    return 'Do not mistake this channel for charity or weakness.';
+  }
+
+  return 'Persuasion matters, but the numbers must survive inspection.';
+}
+
+function counterLine(context: BargainingAIContext): string {
+  if (!context.result.counteroffer) {
+    return '';
+  }
+
+  return ` Counterproposal: ${JSON.stringify(context.result.counteroffer.offered)} for ${JSON.stringify(context.result.counteroffer.requested)}.`;
+}
+
+function reputationLine(delta: number, reasons: string[]): string {
+  if (delta === 0 || reasons.length === 0) {
+    return '';
+  }
+
+  const direction = delta > 0 ? 'improves' : 'drops';
+  return ` Reputation ${direction} by ${Math.abs(delta)} because ${reasons.join(', ')}.`;
 }
 
 function isOutOfPersonaRequest(message: string): boolean {

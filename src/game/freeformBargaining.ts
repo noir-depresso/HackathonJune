@@ -36,6 +36,7 @@ export type StructuredBargainingIntent = {
   tone: BargainingTone;
   politicalStance: PoliticalStance;
   philosophyAppeal: PhilosophyAppeal;
+  proposalFrame: 'civilization_favor' | 'player_favor' | 'mutual' | 'unclear';
   claims: string[];
   confidence: number;
   missingInfo: string[];
@@ -43,11 +44,15 @@ export type StructuredBargainingIntent = {
 
 export type BargainingAudit = {
   liesDetected: string[];
+  shortagesDetected: string[];
   consequences: string[];
   toneBonus: number;
   politicalBonus: number;
   philosophyBonus: number;
   overlyGoodDeal: boolean;
+  reputationDelta: number;
+  reputationReasons: string[];
+  personalityPass: string;
 };
 
 export type FreeformBargainingResult = {
@@ -70,6 +75,7 @@ Use this exact shape:
   "tone": "polite" | "diplomatic" | "aggressive" | "desperate" | "threatening" | "deceptive",
   "politicalStance": "pro_faction" | "anti_enemy" | "neutral" | "pro_independence" | "corporate" | "humanitarian",
   "philosophyAppeal": "cooperation" | "humanitarian" | "profit" | "domination" | "freedom" | "science" | "tradition",
+  "proposalFrame": "civilization_favor" | "player_favor" | "mutual" | "unclear",
   "claims": [],
   "confidence": 0.0,
   "missingInfo": []
@@ -88,6 +94,7 @@ export const structuredBargainingExamples: StructuredBargainingIntent[] = [
     tone: 'diplomatic',
     politicalStance: 'humanitarian',
     philosophyAppeal: 'cooperation',
+    proposalFrame: 'mutual',
     claims: ['This deal helps both colonies survive.'],
     confidence: 0.92,
     missingInfo: [],
@@ -100,6 +107,7 @@ export const structuredBargainingExamples: StructuredBargainingIntent[] = [
     tone: 'aggressive',
     politicalStance: 'corporate',
     philosophyAppeal: 'profit',
+    proposalFrame: 'civilization_favor',
     claims: ['This will expand your monopoly.'],
     confidence: 0.88,
     missingInfo: [],
@@ -112,6 +120,7 @@ export const structuredBargainingExamples: StructuredBargainingIntent[] = [
     tone: 'polite',
     politicalStance: 'pro_independence',
     philosophyAppeal: 'freedom',
+    proposalFrame: 'unclear',
     claims: ['Independent colonies should help each other.'],
     confidence: 0.43,
     missingInfo: ['offered resources', 'requested resources'],
@@ -124,6 +133,7 @@ export const structuredBargainingExamples: StructuredBargainingIntent[] = [
     tone: 'diplomatic',
     politicalStance: 'neutral',
     philosophyAppeal: 'profit',
+    proposalFrame: 'unclear',
     claims: [],
     confidence: 0.8,
     missingInfo: [],
@@ -157,6 +167,7 @@ export function extractFreeformBargainingIntent(
     tone: detectTone(normalizedMessage),
     politicalStance: detectPoliticalStance(normalizedMessage),
     philosophyAppeal: detectPhilosophyAppeal(normalizedMessage),
+    proposalFrame: detectProposalFrame(normalizedMessage),
     claims: extractClaims(message),
     confidence: missingInfo.length > 0 ? 0.45 : 0.82,
     missingInfo,
@@ -192,6 +203,7 @@ export function sanitizeStructuredIntent(
     philosophyAppeal: isPhilosophyAppeal(candidate.philosophyAppeal)
       ? candidate.philosophyAppeal
       : 'cooperation',
+    proposalFrame: isProposalFrame(candidate.proposalFrame) ? candidate.proposalFrame : 'unclear',
     claims: Array.isArray(candidate.claims) ? candidate.claims.map(String) : [],
     confidence: clamp(Number(candidate.confidence) || 0.5, 0, 1),
     missingInfo,
@@ -236,16 +248,21 @@ function auditStructuredBargain(
   offer: NegotiationOffer | undefined
 ): BargainingAudit {
   const liesDetected: string[] = [];
+  const shortagesDetected: string[] = [];
   const consequences: string[] = [];
 
   if (!offer) {
     return {
       liesDetected,
+      shortagesDetected,
       consequences,
       toneBonus: 0,
       politicalBonus: 0,
       philosophyBonus: 0,
       overlyGoodDeal: false,
+      reputationDelta: 0,
+      reputationReasons: [],
+      personalityPass: personalityPassFor(faction),
     };
   }
 
@@ -261,7 +278,7 @@ function auditStructuredBargain(
     const available = faction.inventory[resourceId as ResourceId] ?? 0;
 
     if ((amount ?? 0) > available) {
-      liesDetected.push(`${faction.name} was asked for ${amount} ${resourceId} but only has ${available}.`);
+      shortagesDetected.push(`${faction.name} can only provide ${available} ${resourceId}, not ${amount}.`);
     }
   }
 
@@ -279,17 +296,26 @@ function auditStructuredBargain(
     consequences.push('Trust and relationship will drop if this negotiation is confirmed.');
   }
 
+  if (shortagesDetected.length > 0) {
+    consequences.push('Impossible requests make the negotiator less receptive.');
+  }
+
   const toneBonus = weightedBonus(faction.tonePreferences, structured.tone, 12);
   const politicalBonus = weightedBonus(faction.politicalStances, structured.politicalStance, 12);
   const philosophyBonus = weightedBonus(faction.philosophy, structured.philosophyAppeal, 14);
+  const reputation = calculateReputationDelta(structured, faction, liesDetected, shortagesDetected);
 
   return {
     liesDetected,
+    shortagesDetected,
     consequences,
     toneBonus,
     politicalBonus,
     philosophyBonus,
     overlyGoodDeal: isOverlyGoodDeal(offer, faction),
+    reputationDelta: reputation.delta,
+    reputationReasons: reputation.reasons,
+    personalityPass: personalityPassFor(faction),
   };
 }
 
@@ -319,6 +345,15 @@ function applyAuditToResult(
       outcome: 'reject',
       reason: 'lie_detected',
       score: result.score - faction.liePenalty,
+    };
+  }
+
+  if (audit.shortagesDetected.length > 0 && result.reason !== 'lie_detected') {
+    result = {
+      ...result,
+      outcome: 'reject',
+      reason: 'shortage',
+      score: Math.min(result.score, -20),
     };
   }
 
@@ -376,12 +411,7 @@ function isOverlyGoodDeal(offer: NegotiationOffer, faction: Faction): boolean {
 
 function extractSideBundle(message: string, side: 'offer' | 'request'): ResourceBundle {
   const bundle: ResourceBundle = {};
-  const pattern =
-    side === 'offer'
-      ? /(?:offer|ofer|give|pay|trade|send|provide)\s+(.+?)(?:\s+(?:for|if|in exchange|to get|for your)|$)/i
-      : /(?:for|want|need|request|ask for|get|give me|send me)\s+(.+)$/i;
-  const match = message.match(pattern);
-  const text = match?.[1] ?? '';
+  const text = extractTradeSideText(message, side);
 
   for (const resourceId of Object.keys(resources) as ResourceId[]) {
     const aliases = resourceAliases(resourceId);
@@ -406,6 +436,43 @@ function extractSideBundle(message: string, side: 'offer' | 'request'): Resource
   }
 
   return bundle;
+}
+
+function extractTradeSideText(message: string, side: 'offer' | 'request'): string {
+  const normalized = message
+    .replace(/\bofer\b/g, 'offer')
+    .replace(/\bfuel cells\b/g, 'fuel_cells')
+    .replace(/\bnow\b/g, '')
+    .trim();
+  const forSplit = normalized.match(/^(.*?)(?:\s+for\s+)(.+)$/i);
+
+  if (forSplit) {
+    const left = cleanTradePhrase(forSplit[1]);
+    const right = cleanTradePhrase(forSplit[2]);
+    return side === 'offer' ? left : right;
+  }
+
+  const pattern =
+    side === 'offer'
+      ? /(?:offer|give|pay|trade|send|provide)\s+(.+?)(?:\s+(?:if|in exchange|to get|for your)|$)/i
+      : /(?:want|need|request|ask for|get|give me|send me)\s+(.+)$/i;
+  const match = normalized.match(pattern);
+
+  return cleanTradePhrase(match?.[1] ?? '');
+}
+
+function cleanTradePhrase(text: string): string {
+  return text
+    .replace(/\bi want to\b/g, '')
+    .replace(/\bi want\b/g, '')
+    .replace(/\bi can\b/g, '')
+    .replace(/\bi will\b/g, '')
+    .replace(/\bto trade\b/g, '')
+    .replace(/\btrade\b/g, '')
+    .replace(/\boffer\b/g, '')
+    .replace(/\bgive me\b/g, '')
+    .replace(/\brequest\b/g, '')
+    .trim();
 }
 
 function detectFaction(
@@ -450,6 +517,22 @@ function detectPhilosophyAppeal(message: string): PhilosophyAppeal {
   return 'cooperation';
 }
 
+function detectProposalFrame(message: string): StructuredBargainingIntent['proposalFrame'] {
+  if (/good for you|favor of (your|the)|benefits you|your people gain|helps your|for your civilization|for your faction/i.test(message)) {
+    return 'civilization_favor';
+  }
+
+  if (/good for me|i benefit|i need|help me|my profit|my ship/i.test(message)) {
+    return 'player_favor';
+  }
+
+  if (/both|mutual|shared|together|fair|win-win|each other/i.test(message)) {
+    return 'mutual';
+  }
+
+  return 'unclear';
+}
+
 function extractClaims(message: string): string[] {
   return message
     .split(/[.!?]/)
@@ -488,6 +571,75 @@ function resourceAliases(resourceId: ResourceId): string[] {
 
 function weightedBonus(weights: Record<string, number>, key: string, scale: number): number {
   return ((weights[key] ?? 1) - 1) * scale;
+}
+
+function calculateReputationDelta(
+  structured: StructuredBargainingIntent,
+  faction: Faction,
+  liesDetected: string[],
+  shortagesDetected: string[]
+): { delta: number; reasons: string[] } {
+  const rules = faction.reputationRules as Record<string, number>;
+  const reasons: string[] = [];
+  let delta = 0;
+
+  if (structured.proposalFrame === 'civilization_favor') {
+    delta += rules.acknowledgedCivilizationFavor ?? 0;
+    reasons.push('player framed the bargain as favoring the civilization');
+  } else if (structured.proposalFrame === 'player_favor') {
+    delta += rules.selfServingDeal ?? 0;
+    reasons.push('player framed the bargain as self-serving');
+  } else if (structured.proposalFrame === 'mutual') {
+    delta += Math.ceil((rules.acknowledgedCivilizationFavor ?? 0) / 2);
+    reasons.push('player framed the bargain as mutual');
+  }
+
+  if ((faction.philosophy as Record<string, number>)[structured.philosophyAppeal] > 1) {
+    delta += rules.alignedPolitics ?? 0;
+    reasons.push(`${structured.philosophyAppeal} appeal aligns with ideology`);
+  } else if ((faction.philosophy as Record<string, number>)[structured.philosophyAppeal] < 0.8) {
+    delta += rules.misalignedPolitics ?? 0;
+    reasons.push(`${structured.philosophyAppeal} appeal clashes with ideology`);
+  }
+
+  if (structured.tone === 'polite' || structured.tone === 'diplomatic') {
+    delta += rules.respectfulTone ?? 0;
+    reasons.push('respectful tone');
+  }
+
+  if (structured.tone === 'aggressive' || structured.tone === 'threatening') {
+    delta += rules.hostileTone ?? 0;
+    reasons.push('hostile tone');
+  }
+
+  if (shortagesDetected.length > 0) {
+    delta += rules.impossibleAsk ?? 0;
+    reasons.push('asked for stock the civilization cannot provide');
+  }
+
+  if (liesDetected.length > 0) {
+    delta -= Math.max(6, faction.liePenalty);
+    reasons.push('scanner caught a false player claim');
+  }
+
+  return {
+    delta: clamp(Math.round(delta), -20, 20),
+    reasons,
+  };
+}
+
+function personalityPassFor(faction: Faction): string {
+  const passes = faction.personalityPasses as Record<string, string>;
+
+  if (faction.relationshipWithPlayer >= 45 || faction.trust >= 65) {
+    return passes.trusted ?? faction.personality;
+  }
+
+  if (faction.relationshipWithPlayer < -10 || faction.trust < 25) {
+    return passes.distrusted ?? faction.personality;
+  }
+
+  return passes.neutral ?? faction.personality;
 }
 
 function emptyResult(reason: NegotiationResult['reason']): NegotiationResult {
@@ -536,6 +688,10 @@ function isPhilosophyAppeal(value: unknown): value is PhilosophyAppeal {
     value === 'science' ||
     value === 'tradition'
   );
+}
+
+function isProposalFrame(value: unknown): value is StructuredBargainingIntent['proposalFrame'] {
+  return value === 'civilization_favor' || value === 'player_favor' || value === 'mutual' || value === 'unclear';
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -74,7 +74,7 @@ export function evaluateOffer(offer: NegotiationOffer, factionOverride?: Faction
   const requestedValue = calculateBundleValue(offer.requested, faction);
   const shortageResource = findShortageResource(offer.requested, faction);
 
-  let score = offeredValue - requestedValue;
+  let score = ((offeredValue - requestedValue) / Math.max(1, requestedValue)) * 100;
   score += faction.relationshipWithPlayer * rules.relationshipMultiplier;
   score += faction.trust * rules.trustMultiplier;
   score /= faction.greed;

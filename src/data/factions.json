@@ -3,6 +3,12 @@
     "name": "Vega Union",
     "ideology": "Cooperative trade federation",
     "personality": "diplomatic",
+    "voiceStyle": "active_kind",
+    "personalityPasses": {
+      "trusted": "warm, active, generous, coalition-minded",
+      "neutral": "kind but procedural, asks for mutual benefit",
+      "distrusted": "disappointed but civil, insists on transparency"
+    },
     "wealth": 700,
     "relationshipWithPlayer": 20,
     "alliances": ["nova_frontier"],
@@ -38,6 +44,15 @@
       "deceptive": 0.4
     },
     "liePenalty": 18,
+    "reputationRules": {
+      "acknowledgedCivilizationFavor": 4,
+      "alignedPolitics": 3,
+      "misalignedPolitics": -3,
+      "respectfulTone": 2,
+      "hostileTone": -6,
+      "impossibleAsk": -2,
+      "selfServingDeal": -2
+    },
     "overlyGoodDealPolicy": "cautious",
     "overlyGoodDealMultiplier": 2.8,
     "riskTolerance": 0.8,
@@ -57,6 +72,12 @@
     "name": "Eclipse Combine",
     "ideology": "Corporate monopoly expansion",
     "personality": "calculating",
+    "voiceStyle": "logical",
+    "personalityPasses": {
+      "trusted": "precise, efficient, profit-aware, professionally respectful",
+      "neutral": "logical, transactional, skeptical of sentiment",
+      "distrusted": "cold, adversarial, audits every claim"
+    },
     "wealth": 1200,
     "relationshipWithPlayer": -10,
     "alliances": [],
@@ -92,6 +113,15 @@
       "deceptive": 0.8
     },
     "liePenalty": 10,
+    "reputationRules": {
+      "acknowledgedCivilizationFavor": 3,
+      "alignedPolitics": 4,
+      "misalignedPolitics": -5,
+      "respectfulTone": 0,
+      "hostileTone": -2,
+      "impossibleAsk": -1,
+      "selfServingDeal": -1
+    },
     "overlyGoodDealPolicy": "accept",
     "overlyGoodDealMultiplier": 3.5,
     "riskTolerance": 1.2,
@@ -111,6 +141,12 @@
     "name": "Nova Frontier",
     "ideology": "Independent survival colonies",
     "personality": "practical",
+    "voiceStyle": "active_kind",
+    "personalityPasses": {
+      "trusted": "direct, warm, protective, freedom-focused",
+      "neutral": "practical, guarded, community-first",
+      "distrusted": "sharp, hostile to exploitation, refuses pressure"
+    },
     "wealth": 480,
     "relationshipWithPlayer": 5,
     "alliances": ["vega_union"],
@@ -146,6 +182,15 @@
       "deceptive": 0.25
     },
     "liePenalty": 25,
+    "reputationRules": {
+      "acknowledgedCivilizationFavor": 5,
+      "alignedPolitics": 5,
+      "misalignedPolitics": -6,
+      "respectfulTone": 3,
+      "hostileTone": -8,
+      "impossibleAsk": -3,
+      "selfServingDeal": -4
+    },
     "overlyGoodDealPolicy": "decline",
     "overlyGoodDealMultiplier": 2.2,
     "riskTolerance": 0.9,

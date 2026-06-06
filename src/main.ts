@@ -26,6 +26,7 @@ type GoodId = 'medicine' | 'ore' | 'star_silk' | 'alien_relics';
 type SupplyId = 'food' | 'water' | 'fuel';
 type TradeItemId = GoodId | SupplyId;
 type LocationId = 'vega' | 'sirius' | 'nova7';
+type StockId = 'vega_credit' | 'sirius_ore' | 'nova_life' | 'caravan_lux' | 'dust_salvage';
 type FactionId =
   | 'vega_exchange'
   | 'sirius_guild'
@@ -35,6 +36,8 @@ type FactionId =
 type AllianceStatus = 'none' | 'trade_pact' | 'alliance';
 type FactionStance = 'ally' | 'friendly' | 'neutral' | 'rival' | 'hostile';
 type SidebarTab = 'market' | 'ledger' | 'bargain';
+type LogTab = 'conversation' | 'account' | 'stocks';
+type StockLeverage = 1 | 2 | 3;
 
 type Good = {
   id: GoodId;
@@ -79,6 +82,24 @@ type Player = {
   cargoCapacity: number;
   supplies: Record<SupplyId, number>;
   cargo: Partial<Record<GoodId, number>>;
+};
+
+type Stock = {
+  id: StockId;
+  symbol: string;
+  name: string;
+  sector: string;
+  basePrice: number;
+  price: number;
+  drift: number;
+  volatility: number;
+  history: number[];
+};
+
+type StockPosition = {
+  shares: number;
+  averagePrice: number;
+  averageLeverage: number;
 };
 
 type Faction = {
@@ -365,6 +386,64 @@ const diplomacy: Record<FactionId, DiplomacyState> = {
   dust_runners: { relationship: -6, alliance: 'none' },
 };
 
+const stocks: Record<StockId, Stock> = {
+  vega_credit: {
+    id: 'vega_credit',
+    symbol: 'VCI',
+    name: 'Vega Credit Index',
+    sector: 'Banking and licensed trade',
+    basePrice: 86,
+    price: 86,
+    drift: 0.004,
+    volatility: 0.035,
+    history: [86],
+  },
+  sirius_ore: {
+    id: 'sirius_ore',
+    symbol: 'SOT',
+    name: 'Sirius Ore Trust',
+    sector: 'Mining and refinery contracts',
+    basePrice: 134,
+    price: 134,
+    drift: 0.003,
+    volatility: 0.045,
+    history: [134],
+  },
+  nova_life: {
+    id: 'nova_life',
+    symbol: 'NLF',
+    name: 'Nova Lifeline Fund',
+    sector: 'Medicine, food, and water logistics',
+    basePrice: 62,
+    price: 62,
+    drift: 0.002,
+    volatility: 0.032,
+    history: [62],
+  },
+  caravan_lux: {
+    id: 'caravan_lux',
+    symbol: 'CLX',
+    name: 'Caravan Luxuries',
+    sector: 'Star silk and rare goods',
+    basePrice: 218,
+    price: 218,
+    drift: 0.003,
+    volatility: 0.052,
+    history: [218],
+  },
+  dust_salvage: {
+    id: 'dust_salvage',
+    symbol: 'DSP',
+    name: 'Dust Salvage Pool',
+    sector: 'Scrap, salvage, and black-route risk',
+    basePrice: 41,
+    price: 41,
+    drift: 0.001,
+    volatility: 0.06,
+    history: [41],
+  },
+};
+
 const factionAliases: Record<string, BargainFactionId> = {
   vega: 'vega_union',
   vega_union: 'vega_union',
@@ -406,13 +485,27 @@ const bargainingState: {
 };
 
 const factionIds = Object.keys(factions) as FactionId[];
+const stockIds = Object.keys(stocks) as StockId[];
 
 let gameOver = false;
 let gameOverReason = '';
 let pendingEvent: PendingEvent | null = null;
 let activeSpecial: MarketSpecial | null = null;
 let activeSidebarTab: SidebarTab = 'market';
+let activeLogTab: LogTab = 'conversation';
+let infoScreenOpen = false;
 let selectedVendorId: string | null = null;
+let stockLeverage: StockLeverage = 1;
+const conversationEntries: string[] = [];
+const accountEntries: string[] = [];
+const stockPositions: Partial<Record<StockId, StockPosition>> = {};
+const stockMarketBias: Record<StockId, number> = {
+  vega_credit: 0,
+  sirius_ore: 0,
+  nova_life: 0,
+  caravan_lux: 0,
+  dust_salvage: 0,
+};
 
 const app = document.querySelector<HTMLDivElement>('#app');
 
@@ -425,11 +518,21 @@ app.innerHTML = `
     <header class="era-header">
       <div>STAR TRADER</div>
       <div id="header-location"></div>
-      <div id="header-day"></div>
+      <div class="header-tools">
+        <button id="info-button" class="info-button" type="button" aria-label="Open information screen">i</button>
+        <span id="header-day"></span>
+      </div>
     </header>
 
     <main class="era-main">
-      <section class="era-log" id="log"></section>
+      <section class="era-log-shell">
+        <div class="log-tab-row">
+          <button id="log-tab-conversation" class="tab-button">COMMS</button>
+          <button id="log-tab-account" class="tab-button">ACCOUNT</button>
+          <button id="log-tab-stocks" class="tab-button">STOCKS</button>
+        </div>
+        <div class="era-log" id="log"></div>
+      </section>
 
       <aside class="era-sidebar">
         <section class="era-box">
@@ -461,14 +564,74 @@ app.innerHTML = `
 
     <footer class="era-command-area">
       <div class="era-command-title">COMMAND</div>
-      <div id="commands" class="era-command-grid"></div>
-
       <form id="manual-form" class="manual-form">
         <span>&gt;</span>
         <input id="manual-input" placeholder="type command, e.g. buy ore 1, vendor vega-vanto, gift 120" autocomplete="off" />
       </form>
+      <div id="commands" class="era-command-grid"></div>
     </footer>
   </div>
+
+  <section id="info-screen" class="info-screen hidden" aria-hidden="true">
+    <div class="info-panel" role="dialog" aria-modal="true" aria-labelledby="info-title">
+      <div class="info-panel-header">
+        <h1 id="info-title">How To Play</h1>
+        <button id="info-close" class="info-close-button" type="button" aria-label="Close information screen">X</button>
+      </div>
+
+      <div class="info-panel-body">
+        <section>
+          <h2>Goal</h2>
+          <p>Survive as a small merchant ship by managing credits, supplies, cargo, routes, vendors, factions, and negotiated deals.</p>
+        </section>
+
+        <section>
+          <h2>Core Loop</h2>
+          <ul>
+            <li>Buy supplies or trade goods from the current vendor.</li>
+            <li>Sell cargo where the bid price is better than what you paid.</li>
+            <li>Travel between ports, spending fuel and advancing the day.</li>
+            <li>Keep food, water, and fuel above reserve lines or the run can collapse.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Interface</h2>
+          <ul>
+            <li>COMMS shows story, chat, events, and negotiation messages.</li>
+            <li>ACCOUNT records every mechanical change: credits, cargo, supplies, reputation, alliances, and completed bargains.</li>
+            <li>STOCKS shows market prices, line graphs, daily gains/losses, portfolio value, and buy/sell controls.</li>
+            <li>MARKET selects vendors and shows prices. LEDGER shows faction politics. BARGAIN opens faction negotiation.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Stocks</h2>
+          <ul>
+            <li>Each stock has its own base price, drift, volatility, and sector.</li>
+            <li>Prices update every day from random movement, faction reputation, events, and player trade actions.</li>
+            <li>Use leverage carefully. Higher leverage lowers entry cost, but profit and loss are magnified when selling.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Bargaining</h2>
+          <ul>
+            <li>You can chat naturally in the BARGAIN tab, but factions stay in character and will not obey out-of-world requests.</li>
+            <li>Concrete deals can be item for item, credits for item, item for credits, or mixed bundles.</li>
+            <li>The game audits the real inventories and detects impossible claims. False claims hurt trust and reputation.</li>
+            <li>Accepted natural-language deals apply immediately. Counteroffers wait for Accept Counter.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Useful Commands</h2>
+          <p>Try: status, market, ledger, stocks, bargain, buy ore 1, sell ore 1, stock buy vega_credit 1, leverage 2, vendor vega-vanto, gift 100, travel sirius, end.</p>
+          <p>Natural offer example: I offer Nova 500 credits for 10 fuel as humanitarian support.</p>
+        </section>
+      </div>
+    </div>
+  </section>
 `;
 
 const logEl = document.querySelector<HTMLDivElement>('#log')!;
@@ -478,12 +641,18 @@ const networkPanelEl = document.querySelector<HTMLDivElement>('#network-panel')!
 const diplomacyEl = document.querySelector<HTMLDivElement>('#diplomacy')!;
 const commandsEl = document.querySelector<HTMLDivElement>('#commands')!;
 const headerLocationEl = document.querySelector<HTMLDivElement>('#header-location')!;
-const headerDayEl = document.querySelector<HTMLDivElement>('#header-day')!;
+const headerDayEl = document.querySelector<HTMLSpanElement>('#header-day')!;
 const manualForm = document.querySelector<HTMLFormElement>('#manual-form')!;
 const manualInput = document.querySelector<HTMLInputElement>('#manual-input')!;
 const tabMarketButton = document.querySelector<HTMLButtonElement>('#tab-market')!;
 const tabLedgerButton = document.querySelector<HTMLButtonElement>('#tab-ledger')!;
 const tabBargainButton = document.querySelector<HTMLButtonElement>('#tab-bargain')!;
+const logTabConversationButton = document.querySelector<HTMLButtonElement>('#log-tab-conversation')!;
+const logTabAccountButton = document.querySelector<HTMLButtonElement>('#log-tab-account')!;
+const logTabStocksButton = document.querySelector<HTMLButtonElement>('#log-tab-stocks')!;
+const infoButton = document.querySelector<HTMLButtonElement>('#info-button')!;
+const infoCloseButton = document.querySelector<HTMLButtonElement>('#info-close')!;
+const infoScreenEl = document.querySelector<HTMLElement>('#info-screen')!;
 
 tabMarketButton.addEventListener('click', () => {
   activeSidebarTab = 'market';
@@ -499,6 +668,38 @@ tabBargainButton.addEventListener('click', () => {
   bargainingState.selectedFactionId = factionToBargainFaction[currentVendor().factionId];
   activeSidebarTab = 'bargain';
   render();
+});
+
+logTabConversationButton.addEventListener('click', () => {
+  activeLogTab = 'conversation';
+  renderLogPanel();
+});
+
+logTabAccountButton.addEventListener('click', () => {
+  activeLogTab = 'account';
+  renderLogPanel();
+});
+
+logTabStocksButton.addEventListener('click', () => {
+  activeLogTab = 'stocks';
+  renderLogPanel();
+});
+
+infoButton.addEventListener('click', () => {
+  infoScreenOpen = true;
+  renderInfoScreen();
+});
+
+infoCloseButton.addEventListener('click', () => {
+  infoScreenOpen = false;
+  renderInfoScreen();
+});
+
+infoScreenEl.addEventListener('click', (event) => {
+  if (event.target === infoScreenEl) {
+    infoScreenOpen = false;
+    renderInfoScreen();
+  }
 });
 
 function currentLocation(): Location {
@@ -629,7 +830,13 @@ function randomFactionPair(): [FactionId, FactionId] {
 }
 
 function adjustRelationship(factionId: FactionId, change: number): void {
+  const before = diplomacy[factionId].relationship;
   diplomacy[factionId].relationship = Math.max(-100, Math.min(100, diplomacy[factionId].relationship + change));
+  const after = diplomacy[factionId].relationship;
+
+  if (change !== 0 && before !== after) {
+    accountLog(`REPUTATION | ${factionName(factionId)}: ${before} -> ${after} (${after - before > 0 ? '+' : ''}${after - before})`);
+  }
 }
 
 function factionStance(first: FactionId, second: FactionId): FactionStance {
@@ -730,6 +937,217 @@ function offerPrices(vendor: Vendor, offer: VendorOffer): { ask: number; bid?: n
   return { ask, bid };
 }
 
+function stockLabel(stockId: StockId): string {
+  const stock = stocks[stockId];
+  return `${stock.symbol} (${stock.name})`;
+}
+
+function influenceStock(stockId: StockId, percent: number): void {
+  stockMarketBias[stockId] += percent;
+}
+
+function influenceFactionStocks(factionId: FactionId, percent: number): void {
+  const stockMap: Record<FactionId, StockId> = {
+    vega_exchange: 'vega_credit',
+    sirius_guild: 'sirius_ore',
+    nova_relief: 'nova_life',
+    free_caravans: 'caravan_lux',
+    dust_runners: 'dust_salvage',
+  };
+
+  influenceStock(stockMap[factionId], percent);
+}
+
+function stockForGood(goodId: GoodId): StockId {
+  const stockMap: Record<GoodId, StockId> = {
+    medicine: 'nova_life',
+    ore: 'sirius_ore',
+    star_silk: 'caravan_lux',
+    alien_relics: 'dust_salvage',
+  };
+
+  return stockMap[goodId];
+}
+
+function stockForTradeItem(itemId: TradeItemId): StockId {
+  if (itemId === 'food' || itemId === 'water') return 'nova_life';
+  if (itemId === 'fuel') return 'sirius_ore';
+  return stockForGood(itemId as GoodId);
+}
+
+function influenceBundleStocks(bundle: ResourceBundle, direction: 1 | -1): void {
+  for (const [resourceId, amount] of Object.entries(bundle)) {
+    if (resourceId === 'credits' || amount <= 0) {
+      continue;
+    }
+
+    influenceStock(stockForTradeItem(resourceId as TradeItemId), direction * Math.min(0.014, amount / 800));
+  }
+}
+
+function stockPortfolioValue(): number {
+  return stockIds.reduce((total, stockId) => total + stockPositionValue(stockId), 0);
+}
+
+function stockPositionValue(stockId: StockId): number {
+  const position = stockPositions[stockId];
+
+  if (!position) {
+    return 0;
+  }
+
+  const margin = (position.averagePrice * position.shares) / position.averageLeverage;
+  const leveragedProfit = (stocks[stockId].price - position.averagePrice) * position.shares * position.averageLeverage;
+  return Math.max(0, Math.round(margin + leveragedProfit));
+}
+
+function stockDayChange(stockId: StockId): number {
+  const history = stocks[stockId].history;
+
+  if (history.length < 2) {
+    return 0;
+  }
+
+  return stocks[stockId].price - history[history.length - 2];
+}
+
+function stockDayChangePercent(stockId: StockId): number {
+  const history = stocks[stockId].history;
+
+  if (history.length < 2) {
+    return 0;
+  }
+
+  const previous = history[history.length - 2];
+  return previous === 0 ? 0 : ((stocks[stockId].price - previous) / previous) * 100;
+}
+
+function applyStockMarketTurn(): void {
+  const changes: string[] = [];
+
+  for (const stockId of stockIds) {
+    const stock = stocks[stockId];
+    const before = stock.price;
+    const randomMove = (Math.random() * 2 - 1) * stock.volatility;
+    const relationshipSupport = stockRelationshipSupport(stockId);
+    const bias = stockMarketBias[stockId];
+    const rawPercent = stock.drift + randomMove + relationshipSupport + bias;
+    const clampedPercent = Math.max(-0.075, Math.min(0.075, rawPercent));
+
+    stock.price = Math.max(4, Math.round(stock.price * (1 + clampedPercent)));
+    stock.history.push(stock.price);
+
+    if (stock.history.length > 18) {
+      stock.history.shift();
+    }
+
+    stockMarketBias[stockId] = 0;
+    changes.push(`${stock.symbol} ${before} -> ${stock.price} (${formatSignedPercent(clampedPercent * 100)})`);
+  }
+
+  accountLog(`STOCK MARKET | ${changes.join('; ')}.`);
+}
+
+function buyStock(stockIdText: string, amountText: string): void {
+  const stockId = stockIdText as StockId;
+  const shares = Number(amountText);
+  const stock = stocks[stockId];
+
+  if (!stock || !Number.isInteger(shares) || shares <= 0) {
+    log('Invalid stock purchase. Example: stock buy vega_credit 2');
+    return;
+  }
+
+  const cost = Math.ceil((stock.price * shares) / stockLeverage);
+
+  if (player.credits < cost) {
+    log(`Not enough credits. Need ${cost} credits for ${shares} ${stock.symbol} at ${stockLeverage}x.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  const current = stockPositions[stockId];
+  player.credits -= cost;
+
+  if (current) {
+    const totalShares = current.shares + shares;
+    current.averagePrice = Math.round(((current.averagePrice * current.shares) + (stock.price * shares)) / totalShares);
+    current.averageLeverage = Math.round((((current.averageLeverage * current.shares) + (stockLeverage * shares)) / totalShares) * 10) / 10;
+    current.shares = totalShares;
+  } else {
+    stockPositions[stockId] = {
+      shares,
+      averagePrice: stock.price,
+      averageLeverage: stockLeverage,
+    };
+  }
+
+  influenceStock(stockId, shares > 5 ? 0.006 : 0.003);
+  log(`Bought ${shares} ${stock.symbol} shares at ${stock.price} credits using ${stockLeverage}x leverage.`);
+  accountLog(`STOCK BUY | ${shares} ${stockLabel(stockId)}. Credits ${beforeCredits} -> ${player.credits}. Cost ${cost}.`);
+}
+
+function sellStock(stockIdText: string, amountText: string): void {
+  const stockId = stockIdText as StockId;
+  const shares = Number(amountText);
+  const stock = stocks[stockId];
+  const position = stockPositions[stockId];
+
+  if (!stock || !position || !Number.isInteger(shares) || shares <= 0) {
+    log('Invalid stock sale. Example: stock sell vega_credit 1');
+    return;
+  }
+
+  if (position.shares < shares) {
+    log(`You only hold ${position.shares} ${stock.symbol} shares.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  const returnedMargin = (position.averagePrice * shares) / position.averageLeverage;
+  const leveragedProfit = (stock.price - position.averagePrice) * shares * position.averageLeverage;
+  const payout = Math.max(0, Math.round(returnedMargin + leveragedProfit));
+
+  player.credits += payout;
+  position.shares -= shares;
+
+  if (position.shares <= 0) {
+    delete stockPositions[stockId];
+  }
+
+  influenceStock(stockId, shares > 5 ? -0.006 : -0.003);
+  log(`Sold ${shares} ${stock.symbol} shares at ${stock.price}. Payout: ${payout} credits.`);
+  accountLog(`STOCK SELL | ${shares} ${stockLabel(stockId)}. Credits ${beforeCredits} -> ${player.credits}. Payout ${payout}.`);
+}
+
+function setStockLeverage(valueText: string): void {
+  const value = Number(valueText);
+
+  if (value !== 1 && value !== 2 && value !== 3) {
+    log('Invalid leverage. Use: leverage 1, leverage 2, or leverage 3.');
+    return;
+  }
+
+  stockLeverage = value;
+  log(`Stock leverage set to ${stockLeverage}x. Higher leverage lowers entry cost but magnifies losses on sale.`);
+}
+
+function stockRelationshipSupport(stockId: StockId): number {
+  const factionMap: Record<StockId, FactionId> = {
+    vega_credit: 'vega_exchange',
+    sirius_ore: 'sirius_guild',
+    nova_life: 'nova_relief',
+    caravan_lux: 'free_caravans',
+    dust_salvage: 'dust_runners',
+  };
+  const relationship = diplomacy[factionMap[stockId]].relationship;
+  return Math.max(-0.012, Math.min(0.012, relationship / 10000));
+}
+
+function formatSignedPercent(value: number): string {
+  return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+}
+
 function specialBadge(vendorId: string, itemId: TradeItemId): string {
   if (!activeSpecial || activeSpecial.vendorId !== vendorId || activeSpecial.itemId !== itemId) {
     return '';
@@ -795,6 +1213,8 @@ function createBorderWarEvent(): PendingEvent {
           const fee = loseCredits(90);
           adjustRelationship(first, 14);
           adjustRelationship(second, -12);
+          influenceFactionStocks(first, 0.018);
+          influenceFactionStocks(second, -0.016);
           log(
             `You funnel ${fee} credits in emergency cargo support to ${factionName(first)}.\nTheir standing rises, and ${factionName(second)} marks you as an enemy broker.`
           );
@@ -807,6 +1227,8 @@ function createBorderWarEvent(): PendingEvent {
           const fee = loseCredits(90);
           adjustRelationship(second, 14);
           adjustRelationship(first, -12);
+          influenceFactionStocks(second, 0.018);
+          influenceFactionStocks(first, -0.016);
           log(
             `You funnel ${fee} credits in emergency cargo support to ${factionName(second)}.\nTheir standing rises, and ${factionName(first)} marks you as an enemy broker.`
           );
@@ -818,6 +1240,8 @@ function createBorderWarEvent(): PendingEvent {
         effect: () => {
           adjustRelationship(first, -2);
           adjustRelationship(second, -2);
+          influenceFactionStocks(first, -0.004);
+          influenceFactionStocks(second, -0.004);
           log(
             `You refuse to enter the convoy war.\nBoth sides call you cautious and unreliable under fire.`
           );
@@ -841,6 +1265,8 @@ function createTariffHearingEvent(): PendingEvent {
           gainSupply('food', 2);
           adjustRelationship(first, 12);
           adjustRelationship(second, -10);
+          influenceFactionStocks(first, 0.014);
+          influenceFactionStocks(second, -0.012);
           log(
             `You testify in favor of ${factionName(first)}.\nThey reward you with fresh provisions, while ${factionName(second)} feels publicly betrayed.`
           );
@@ -853,6 +1279,8 @@ function createTariffHearingEvent(): PendingEvent {
           player.credits += 80;
           adjustRelationship(second, 12);
           adjustRelationship(first, -10);
+          influenceFactionStocks(second, 0.014);
+          influenceFactionStocks(first, -0.012);
           log(
             `You endorse ${factionName(second)} in the tariff hearing.\nTheir merchants pay you for the favor, and ${factionName(first)} turns cold.`
           );
@@ -864,6 +1292,7 @@ function createTariffHearingEvent(): PendingEvent {
         effect: () => {
           adjustRelationship(first, 1);
           adjustRelationship(second, 1);
+          influenceStock('vega_credit', 0.006);
           log(
             `You decline to testify and offer quiet mediation instead.\nNo one gains much, but both factions respect your restraint.`
           );
@@ -887,6 +1316,9 @@ function createRefugeeCorridorEvent(): PendingEvent {
           loseSupply('fuel', 6);
           adjustRelationship(first, 16);
           adjustRelationship(second, -6);
+          influenceFactionStocks(first, 0.018);
+          influenceStock('nova_life', 0.012);
+          influenceFactionStocks(second, -0.006);
           log(
             `You burn 6 fuel escorting relief craft aligned with ${factionName(first)}.\nThey remember the help, while ${factionName(second)} resents being passed over.`
           );
@@ -899,6 +1331,9 @@ function createRefugeeCorridorEvent(): PendingEvent {
           loseSupply('fuel', 6);
           adjustRelationship(second, 16);
           adjustRelationship(first, -6);
+          influenceFactionStocks(second, 0.018);
+          influenceStock('nova_life', 0.012);
+          influenceFactionStocks(first, -0.006);
           log(
             `You burn 6 fuel escorting relief craft aligned with ${factionName(second)}.\nThey remember the help, while ${factionName(first)} resents being passed over.`
           );
@@ -911,6 +1346,7 @@ function createRefugeeCorridorEvent(): PendingEvent {
           loseCredits(40);
           adjustRelationship(first, -5);
           adjustRelationship(second, -5);
+          influenceStock('nova_life', -0.018);
           log(
             `You decline corridor duty and only broadcast a warning relay.\nThe stranded civilians survive without your help, and both factions judge you harshly.`
           );
@@ -926,6 +1362,8 @@ function runGoodEvent(): void {
       const factionId = randomFaction();
       player.credits += 180;
       adjustRelationship(factionId, 8);
+      influenceFactionStocks(factionId, 0.016);
+      influenceStock('dust_salvage', 0.02);
       log(
         `GOOD EVENT - SALVAGE BEACON\nYou recover a legal salvage cache and turn it in cleanly.\nCredits +180, and ${factionName(factionId)} notes your honesty.`
       );
@@ -934,6 +1372,8 @@ function runGoodEvent(): void {
       gainSupply('food', 3);
       gainSupply('water', 3);
       gainSupply('fuel', 8);
+      influenceStock('nova_life', 0.016);
+      influenceStock('vega_credit', 0.008);
       log(
         'GOOD EVENT - RELIEF CONVOY\nA passing convoy tops up your essentials.\nFood +3, water +3, fuel +8.'
       );
@@ -942,6 +1382,7 @@ function runGoodEvent(): void {
       const goodId = randomPick(Object.keys(goods) as GoodId[]);
       gainCargo(goodId, 2);
       player.credits += 70;
+      influenceStock(stockForGood(goodId), 0.018);
       log(
         `GOOD EVENT - FESTIVAL CHARTER\nYou land a ceremonial hauling contract.\nCredits +70 and ${goods[goodId].name} +2.`
       );
@@ -956,12 +1397,15 @@ function runBadEvent(): void {
     () => {
       const foodLost = loseSupply('food', 2);
       const waterLost = loseSupply('water', 3);
+      influenceStock('nova_life', -0.018);
       log(
         `BAD EVENT - HULL BREACH\nA seal failure spoils your stores.\nFood -${foodLost}, water -${waterLost}.`
       );
     },
     () => {
       const creditsLost = loseCredits(160);
+      influenceStock('vega_credit', -0.018);
+      influenceStock('dust_salvage', 0.014);
       log(
         `BAD EVENT - PIRATE TOLL\nAn outlaw checkpoint strips value from your hold.\nCredits -${creditsLost}.`
       );
@@ -970,6 +1414,8 @@ function runBadEvent(): void {
       const fuelLost = loseSupply('fuel', 10);
       const factionId = randomFaction();
       adjustRelationship(factionId, -8);
+      influenceFactionStocks(factionId, -0.014);
+      influenceStock('sirius_ore', -0.01);
       log(
         `BAD EVENT - MISSED DELIVERY\nA fuel manifold fracture costs ${fuelLost} fuel.\nYour delay also angers ${factionName(factionId)}.`
       );
@@ -1040,25 +1486,191 @@ function maybeRollSpecialOffer(): void {
 function advanceTurn(summary: string): void {
   if (gameOver) return;
 
+  const beforeCredits = player.credits;
+  const beforeSupplies = { ...player.supplies };
+  const income = incomePerTurn();
   player.day += 1;
-  player.credits += incomePerTurn();
+  player.credits += income;
   consumeSupplies();
 
   log(
-    `${summary}\nTurn income: ${incomePerTurn()} credits.\nSupplies consumed: food -2, water -2, fuel -1.`
+    `${summary}\nTurn income: ${income} credits.\nSupplies consumed: food -2, water -2, fuel -1.`
+  );
+  accountLog(
+    `TURN ${player.day} | Credits ${beforeCredits} -> ${player.credits} (+${income}). Supplies food ${beforeSupplies.food} -> ${player.supplies.food}, water ${beforeSupplies.water} -> ${player.supplies.water}, fuel ${beforeSupplies.fuel} -> ${player.supplies.fuel}.`
   );
 
   maybeTriggerRandomEvent();
   maybeRollSpecialOffer();
+  applyStockMarketTurn();
   checkGameOver();
 }
 
 function log(message: string): void {
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  entry.textContent = message;
-  logEl.appendChild(entry);
+  conversationEntries.push(message);
+  renderLogPanel();
+}
+
+function accountLog(message: string): void {
+  accountEntries.push(message);
+  renderLogPanel();
+}
+
+function renderLogPanel(): void {
+  logTabConversationButton.className = activeLogTab === 'conversation' ? 'tab-button active-tab' : 'tab-button';
+  logTabAccountButton.className = activeLogTab === 'account' ? 'tab-button active-tab' : 'tab-button';
+  logTabStocksButton.className = activeLogTab === 'stocks' ? 'tab-button active-tab' : 'tab-button';
+
+  if (activeLogTab === 'stocks') {
+    renderStockMarketPanel();
+    return;
+  }
+
+  const entries = activeLogTab === 'conversation' ? conversationEntries : accountEntries;
+  logEl.innerHTML = entries
+    .map((entry) => `<div class="log-entry">${escapeHtml(entry)}</div>`)
+    .join('');
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderStockMarketPanel(): void {
+  const rows = stockIds
+    .map((stockId) => {
+      const stock = stocks[stockId];
+      const position = stockPositions[stockId];
+      const change = stockDayChange(stockId);
+      const changePercent = stockDayChangePercent(stockId);
+      const changeClass = change >= 0 ? 'stock-up' : 'stock-down';
+      const held = position?.shares ?? 0;
+      const value = stockPositionValue(stockId);
+      const graph = renderStockGraph(stock);
+      const buyOneCost = Math.ceil(stock.price / stockLeverage);
+      const buyFiveCost = Math.ceil((stock.price * 5) / stockLeverage);
+
+      return `
+        <article class="stock-row">
+          <div class="stock-identity">
+            <div class="stock-symbol">${stock.symbol}</div>
+            <div>
+              <div class="stock-name">${stock.name}</div>
+              <div class="stock-sector">${stock.sector}</div>
+            </div>
+          </div>
+          <div class="stock-cell stock-price-block">
+            <span class="stock-cell-label">Price</span>
+            <strong>${stock.price}</strong>
+          </div>
+          <div class="stock-cell">
+            <span class="stock-cell-label">Move</span>
+            <strong class="${changeClass}">${change >= 0 ? '+' : ''}${change}</strong>
+            <span class="${changeClass}">${formatSignedPercent(changePercent)}</span>
+          </div>
+          <div class="stock-cell">
+            <span class="stock-cell-label">Owned</span>
+            <strong>${held}</strong>
+            <span>avg ${position ? position.averagePrice : '-'}</span>
+          </div>
+          <div class="stock-cell">
+            <span class="stock-cell-label">Value</span>
+            <strong>${value}</strong>
+            <span>margin</span>
+          </div>
+          <div class="stock-sparkline">${graph}</div>
+          <div class="stock-actions">
+            <button class="stock-trade-button buy-button" data-command="stock buy ${stockId} 1">B1 <span>${buyOneCost}</span></button>
+            <button class="stock-trade-button buy-button" data-command="stock buy ${stockId} 5">B5 <span>${buyFiveCost}</span></button>
+            <button class="stock-trade-button sell-button" data-command="stock sell ${stockId} 1">S1</button>
+            <button class="stock-trade-button sell-button" data-command="stock sell ${stockId} 5">S5</button>
+          </div>
+        </article>
+      `;
+    })
+    .join('');
+
+  logEl.innerHTML = `
+    <div class="stock-market">
+      <div class="stock-market-head">
+        <div>
+          <div class="box-subtitle">STOCK MARKET</div>
+          <div class="ledger-copy">A compact exchange board for faction-linked equities. Prices move from market drift, volatility, reputation, events, travel, trade, and bargaining.</div>
+        </div>
+        <div class="stock-summary">
+          <div class="stat-row"><span>Credits</span><strong>${player.credits}</strong></div>
+          <div class="stat-row"><span>Portfolio</span><strong>${stockPortfolioValue()}</strong></div>
+          <div class="stat-row"><span>Leverage</span><strong>${stockLeverage}x</strong></div>
+        </div>
+      </div>
+      <div class="leverage-row">
+        <button class="tab-button ${stockLeverage === 1 ? 'active-tab' : ''}" data-command="leverage 1">1x</button>
+        <button class="tab-button ${stockLeverage === 2 ? 'active-tab' : ''}" data-command="leverage 2">2x</button>
+        <button class="tab-button ${stockLeverage === 3 ? 'active-tab' : ''}" data-command="leverage 3">3x</button>
+      </div>
+      <div class="stock-table-head">
+        <span>Asset</span>
+        <span>Price</span>
+        <span>Move</span>
+        <span>Owned</span>
+        <span>Value</span>
+        <span>History</span>
+        <span>Trade</span>
+      </div>
+      <div class="stock-board">${rows}</div>
+    </div>
+  `;
+
+  logEl.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+      executeCommand(button.dataset.command ?? '');
+    });
+  });
+}
+
+function renderStockGraph(stock: Stock): string {
+  const width = 150;
+  const height = 42;
+  const values = stock.history;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(1, max - min);
+  const points = values
+    .map((price, index) => {
+      const x = values.length === 1 ? 0 : (index / (values.length - 1)) * width;
+      const y = height - ((price - min) / range) * height;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  const lineClass = values[values.length - 1] >= values[0] ? 'stock-line-up' : 'stock-line-down';
+
+  return `
+    <svg class="stock-graph" viewBox="0 0 ${width} ${height}" role="img" aria-label="${stock.symbol} price graph">
+      <line class="stock-graph-midline" x1="0" y1="${height / 2}" x2="${width}" y2="${height / 2}" />
+      <polyline class="${lineClass}" points="${points}" />
+    </svg>
+  `;
+}
+
+function renderInfoScreen(): void {
+  infoScreenEl.className = infoScreenOpen ? 'info-screen' : 'info-screen hidden';
+  infoScreenEl.setAttribute('aria-hidden', String(!infoScreenOpen));
+}
+
+function clearActiveLog(): void {
+  if (activeLogTab === 'conversation') {
+    conversationEntries.length = 0;
+  } else {
+    accountEntries.length = 0;
+  }
+
+  renderLogPanel();
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
 function renderStatus(): void {
@@ -1097,6 +1709,18 @@ function renderInventory(): void {
     <div class="box-subtitle inventory-separator">TRADE CARGO</div>
     ${cargoRows || `<div class="muted">Empty cargo hold</div>`}
   `;
+}
+
+function formatSupplyChange(before: Record<SupplyId, number>): string {
+  return Object.values(supplies)
+    .map((supply) => `${supply.name} ${before[supply.id]} -> ${player.supplies[supply.id]}`)
+    .join(', ');
+}
+
+function formatCargoChange(before: Partial<Record<GoodId, number>>): string {
+  return Object.values(goods)
+    .map((good) => `${good.name} ${before[good.id] ?? 0} -> ${player.cargo[good.id] ?? 0}`)
+    .join(', ');
 }
 
 function renderMarketTab(): void {
@@ -1295,6 +1919,8 @@ function renderCommands(): void {
     { label: 'Relations', command: 'relations' },
     { label: 'View Ledger', command: 'tab ledger' },
     { label: 'Bargain AI', command: 'bargain' },
+    { label: 'Stock Market', command: 'stocks' },
+    { label: `Leverage ${stockLeverage === 3 ? 1 : stockLeverage + 1}x`, command: `leverage ${stockLeverage === 3 ? 1 : stockLeverage + 1}` },
   ];
 
   for (const stationVendor of vendorsAtLocation()) {
@@ -1382,6 +2008,8 @@ function render(): void {
 
   renderDiplomacy();
   renderCommands();
+  renderLogPanel();
+  renderInfoScreen();
 
   manualInput.disabled = gameOver;
   manualInput.placeholder = gameOver
@@ -1453,6 +2081,7 @@ I offer Vega 140 credits for 1 medicine as humanitarian aid.
 offer eclipse credits 500 for alien_relics 1
 what do you need?
 
+Known civilization channels:
 ${factionsList}`);
 }
 
@@ -1470,20 +2099,23 @@ async function submitBargainingOffer(offer: NegotiationOffer): Promise<void> {
 
   const aiMessage = await generateBargainingAIMessage({
     factionName: faction.name,
+    factionIdeology: faction.ideology,
     factionPersonality: faction.personality,
+    personalityPass: faction.personalityPasses.neutral,
+    relationshipWithPlayer: faction.relationshipWithPlayer,
+    trust: faction.trust,
     offer,
     result,
     fallbackDialogue,
   });
 
   bargainingState.message = aiMessage;
-  log(`${faction.name}: ${aiMessage}`);
+  log(aiMessage);
   render();
 }
 
 async function submitFreeformBargainingMessage(message: string): Promise<void> {
   activeSidebarTab = 'bargain';
-  bargainingState.selectedFactionId = factionToBargainFaction[currentVendor().factionId];
   bargainingState.message = 'Parsing bargain into structured JSON...';
   render();
 
@@ -1493,6 +2125,7 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
     factionAliases,
     playerInventory: bargainingPlayerInventory(),
     factionInventories: factionInventorySnapshot(),
+    factionProfiles: factionProfileSnapshot(),
   });
   const freeformResult = evaluateStructuredBargain(structured, factionStates, bargainingPlayerInventory());
   const faction = factionStates[structured.toFaction];
@@ -1505,13 +2138,7 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
       : undefined;
   bargainingState.pendingResult = freeformResult.computedResult;
 
-  if (freeformResult.computedResult.reason === 'lie_detected') {
-    applyBargainingRelationshipChange(structured.toFaction, freeformResult.computedResult);
-  }
-
-  if (freeformResult.computedResult.reason === 'overly_good_suspicious') {
-    applyBargainingRelationshipChange(structured.toFaction, freeformResult.computedResult);
-  }
+  applyNegotiationReputationDelta(structured.toFaction, freeformResult.audit.reputationDelta);
 
   if (!freeformResult.offer) {
     const missing = structured.missingInfo.join(', ') || 'a clear offer';
@@ -1524,6 +2151,8 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
           factionPersonality: faction.personality,
           relationshipWithPlayer: faction.relationshipWithPlayer,
           trust: faction.trust,
+          voiceStyle: faction.voiceStyle,
+          personalityPass: freeformResult.audit.personalityPass,
           playerInventory: bargainingPlayerInventory(),
           factionInventory: faction.inventory as ResourceBundle,
           lastBargainingMessage: bargainingState.message,
@@ -1538,7 +2167,11 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
   const fallbackDialogue = generateDialogue(freeformResult.computedResult, faction.name);
   const aiMessage = await generateBargainingAIMessage({
     factionName: faction.name,
+    factionIdeology: faction.ideology,
     factionPersonality: faction.personality,
+    personalityPass: freeformResult.audit.personalityPass,
+    relationshipWithPlayer: faction.relationshipWithPlayer,
+    trust: faction.trust,
     offer: freeformResult.offer,
     result: freeformResult.computedResult,
     fallbackDialogue,
@@ -1547,15 +2180,13 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
   });
 
   bargainingState.message = aiMessage;
-  log(`STRUCTURED JSON ${JSON.stringify(structured)}`);
-  log(`COMPUTER RESULT ${JSON.stringify({
-    outcome: freeformResult.computedResult.outcome,
-    reason: freeformResult.computedResult.reason,
-    score: Math.round(freeformResult.computedResult.score),
-    liesDetected: freeformResult.audit.liesDetected,
-    overlyGoodDeal: freeformResult.audit.overlyGoodDeal,
-  })}`);
-  log(`${faction.name}: ${aiMessage}`);
+  log(aiMessage);
+
+  if (freeformResult.computedResult.outcome === 'accept' && freeformResult.offer) {
+    applyBargainingTrade(freeformResult.offer, freeformResult.computedResult);
+    return;
+  }
+
   render();
 }
 
@@ -1564,6 +2195,25 @@ function factionInventorySnapshot(): Record<BargainFactionId, ResourceBundle> {
     snapshot[factionId as BargainFactionId] = faction.inventory as ResourceBundle;
     return snapshot;
   }, {} as Record<BargainFactionId, ResourceBundle>);
+}
+
+function factionProfileSnapshot(): Record<BargainFactionId, unknown> {
+  return Object.entries(factionStates).reduce((snapshot, [factionId, faction]) => {
+    snapshot[factionId as BargainFactionId] = {
+      name: faction.name,
+      ideology: faction.ideology,
+      personality: faction.personality,
+      voiceStyle: faction.voiceStyle,
+      personalityPasses: faction.personalityPasses,
+      reputationRules: faction.reputationRules,
+      relationshipWithPlayer: faction.relationshipWithPlayer,
+      trust: faction.trust,
+      politicalStances: faction.politicalStances,
+      philosophy: faction.philosophy,
+      bargainingStyle: faction.bargainingStyle,
+    };
+    return snapshot;
+  }, {} as Record<BargainFactionId, unknown>);
 }
 
 function confirmPendingOffer(): void {
@@ -1628,16 +2278,18 @@ function applyBargainingTrade(offer: NegotiationOffer, result: NegotiationResult
   commitBargainingInventory(simulatedInventory);
   faction.inventory = simulatedFactionInventory as BargainFaction['inventory'];
   applyBargainingRelationshipChange(offer.toFaction, result);
+  influenceBundleStocks(offer.requested, 1);
+  influenceBundleStocks(offer.offered, -1);
+  influenceFactionStocks(bargainFactionToMainFaction[offer.toFaction], 0.006);
 
-  const message = `Deal completed: ${formatBundle(offer.offered)} for ${formatBundle(offer.requested)}.
-Credits: ${beforeCredits} -> ${player.credits}
-Food/Water/Fuel: ${beforeSupplies.food}/${beforeSupplies.water}/${beforeSupplies.fuel} -> ${player.supplies.food}/${player.supplies.water}/${player.supplies.fuel}
-Cargo used: ${beforeCargo} -> ${cargoUsed()}
-${faction.name} stores changed: ${formatBundle(beforeFactionInventory)} -> ${formatBundle(faction.inventory as ResourceBundle)}`;
+  const message = `Deal completed with ${faction.name}: ${formatBundle(offer.offered)} for ${formatBundle(offer.requested)}. Account ledger updated.`;
   bargainingState.pendingOffer = undefined;
   bargainingState.pendingResult = undefined;
   bargainingState.message = message;
   log(message);
+  accountLog(
+    `BARGAIN | ${faction.name}. ${formatBundle(offer.offered)} for ${formatBundle(offer.requested)}. Credits ${beforeCredits} -> ${player.credits}. Supplies ${beforeSupplies.food}/${beforeSupplies.water}/${beforeSupplies.fuel} -> ${player.supplies.food}/${player.supplies.water}/${player.supplies.fuel}. Cargo ${beforeCargo} -> ${cargoUsed()}. ${faction.name} stores ${formatBundle(beforeFactionInventory)} -> ${formatBundle(faction.inventory as ResourceBundle)}.`
+  );
   render();
 }
 
@@ -1654,6 +2306,24 @@ function applyBargainingRelationshipChange(factionId: BargainFactionId, result: 
   factionStates[factionId].relationshipWithPlayer += delta.relationshipWithPlayer;
   factionStates[factionId].trust += delta.trust;
   adjustRelationship(mainFactionId, delta.relationshipWithPlayer);
+}
+
+function applyNegotiationReputationDelta(factionId: BargainFactionId, delta: number): void {
+  if (delta === 0) {
+    return;
+  }
+
+  const mainFactionId = bargainFactionToMainFaction[factionId];
+  factionStates[factionId].relationshipWithPlayer = Math.max(
+    -100,
+    Math.min(100, factionStates[factionId].relationshipWithPlayer + delta)
+  );
+  factionStates[factionId].trust = Math.max(
+    0,
+    Math.min(100, factionStates[factionId].trust + Math.round(delta / 2))
+  );
+  adjustRelationship(mainFactionId, delta);
+  accountLog(`NEGOTIATION | ${factionStates[factionId].name} reputation ${delta > 0 ? '+' : ''}${delta}. Trust now ${factionStates[factionId].trust}.`);
 }
 
 function selectVendor(vendorId: string): void {
@@ -1676,6 +2346,9 @@ function buy(itemIdText: string, amountText: string): void {
   const amount = Number(amountText);
   const vendor = currentVendor();
   const offer = findOffer(vendor, itemId);
+  const beforeCredits = player.credits;
+  const beforeSupplies = { ...player.supplies };
+  const beforeCargo = { ...player.cargo };
 
   if (!offer || !Number.isInteger(amount) || amount <= 0) {
     log('Invalid purchase. Example: buy ore 1');
@@ -1704,8 +2377,13 @@ function buy(itemIdText: string, amountText: string): void {
   }
 
   const ripple = applyTradeRipple(vendor.factionId, offer.kind === 'good' ? 2 : 1);
+  influenceFactionStocks(vendor.factionId, 0.004);
+  influenceStock(stockForTradeItem(itemId), offer.kind === 'good' ? 0.006 : 0.003);
   log(
     `Bought ${amount} ${itemName(itemId)} from ${vendor.name} for ${totalCost} credits.\nFaction ripple: ${ripple}.`
+  );
+  accountLog(
+    `BUY | ${amount} ${itemName(itemId)} from ${vendor.name}. Credits ${beforeCredits} -> ${player.credits}. Supplies ${formatSupplyChange(beforeSupplies)}. Cargo ${formatCargoChange(beforeCargo)}.`
   );
 }
 
@@ -1714,6 +2392,8 @@ function sell(itemIdText: string, amountText: string): void {
   const amount = Number(amountText);
   const vendor = currentVendor();
   const offer = findOffer(vendor, itemId);
+  const beforeCredits = player.credits;
+  const beforeCargo = { ...player.cargo };
 
   if (!offer || offer.bid === undefined || !Number.isInteger(amount) || amount <= 0) {
     log('Invalid sale. Example: sell ore 1');
@@ -1738,14 +2418,20 @@ function sell(itemIdText: string, amountText: string): void {
   }
 
   const ripple = applyTradeRipple(vendor.factionId, 2);
+  influenceFactionStocks(vendor.factionId, 0.004);
+  influenceStock(stockForTradeItem(itemId), -0.003);
   log(
     `Sold ${amount} ${goods[itemId].name} to ${vendor.name} for ${earned} credits.\nFaction ripple: ${ripple}.`
+  );
+  accountLog(
+    `SELL | ${amount} ${goods[itemId].name} to ${vendor.name}. Credits ${beforeCredits} -> ${player.credits}. Cargo ${formatCargoChange(beforeCargo)}.`
   );
 }
 
 function gift(amountText: string): void {
   const amount = Number(amountText);
   const vendor = currentVendor();
+  const beforeCredits = player.credits;
 
   if (!Number.isInteger(amount) || amount <= 0) {
     log('Invalid gift. Example: gift 120');
@@ -1761,16 +2447,19 @@ function gift(amountText: string): void {
 
   const relationshipGain = Math.max(2, Math.min(18, Math.floor(amount / 30)));
   adjustRelationship(vendor.factionId, relationshipGain);
+  influenceFactionStocks(vendor.factionId, Math.min(0.018, amount / 12000));
 
   log(
     `You send a ${amount}-credit goodwill package to ${vendor.name}.\n${factionName(vendor.factionId)} relationship improves by ${relationshipGain}.`
   );
+  accountLog(`GIFT | ${vendor.name}. Credits ${beforeCredits} -> ${player.credits}. Reputation +${relationshipGain} with ${factionName(vendor.factionId)}.`);
 }
 
 function requestTradePact(): void {
   const vendor = currentVendor();
   const state = diplomacy[vendor.factionId];
   const fee = 140;
+  const beforeCredits = player.credits;
 
   if (state.alliance !== 'none') {
     log(`${factionName(vendor.factionId)} already has a formal agreement with you.`);
@@ -1790,16 +2479,19 @@ function requestTradePact(): void {
   player.credits -= fee;
   state.alliance = 'trade_pact';
   adjustRelationship(vendor.factionId, 10);
+  influenceFactionStocks(vendor.factionId, 0.02);
 
   log(
     `${factionName(vendor.factionId)} signs a trade pact with your ship.\nYou now receive better terms from every vendor aligned with them.`
   );
+  accountLog(`PACT | ${factionName(vendor.factionId)}. Credits ${beforeCredits} -> ${player.credits}. Alliance: Trade Pact.`);
 }
 
 function requestAlliance(): void {
   const vendor = currentVendor();
   const state = diplomacy[vendor.factionId];
   const fee = 240;
+  const beforeCredits = player.credits;
 
   if (state.alliance === 'alliance') {
     log(`${factionName(vendor.factionId)} is already bound to you by an alliance contract.`);
@@ -1824,10 +2516,12 @@ function requestAlliance(): void {
   player.credits -= fee;
   state.alliance = 'alliance';
   adjustRelationship(vendor.factionId, 8);
+  influenceFactionStocks(vendor.factionId, 0.028);
 
   log(
     `${factionName(vendor.factionId)} accepts an alliance contract.\nTheir vendors now treat you as a strategic partner.`
   );
+  accountLog(`ALLIANCE | ${factionName(vendor.factionId)}. Credits ${beforeCredits} -> ${player.credits}. Alliance: Alliance Contract.`);
 }
 
 function resolvePendingEvent(command: string): boolean {
@@ -1850,6 +2544,7 @@ function travel(destinationId: string): void {
   const location = currentLocation();
   const destination = locations[destinationId as LocationId];
   const fuelCost = location.routes[destinationId as LocationId];
+  const beforeFuel = player.supplies.fuel;
 
   if (!destination || fuelCost === undefined) {
     log('Unknown route.');
@@ -1865,6 +2560,9 @@ function travel(destinationId: string): void {
   player.locationId = destination.id;
   selectedVendorId = destination.vendors[0]?.id ?? null;
   activeSidebarTab = 'market';
+  influenceFactionStocks(destination.governingFaction, 0.006);
+  influenceStock('sirius_ore', -0.004);
+  accountLog(`TRAVEL | ${location.name} -> ${destination.name}. Fuel ${beforeFuel} -> ${player.supplies.fuel} (-${fuelCost}).`);
 
   advanceTurn(
     `You travel to ${destination.name}.\n${destination.description}\nPort authority: ${factionName(destination.governingFaction)}.`
@@ -1898,7 +2596,7 @@ function executeCommand(command: string): void {
     log(`> ${command}`);
   }
 
-  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'tab'].includes(action)) {
+  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'stocks', 'stock', 'leverage', 'tab'].includes(action)) {
     resolvePendingEvent(normalizedCommand);
     render();
     return;
@@ -1914,10 +2612,13 @@ function executeCommand(command: string): void {
   } else if (action === 'ledger') {
     activeSidebarTab = 'ledger';
     showLedger();
+  } else if (action === 'stocks') {
+    activeLogTab = 'stocks';
   } else if (action === 'tab') {
     if (parts[1] === 'ledger') activeSidebarTab = 'ledger';
     if (parts[1] === 'market') activeSidebarTab = 'market';
     if (parts[1] === 'bargain') activeSidebarTab = 'bargain';
+    if (parts[1] === 'stocks') activeLogTab = 'stocks';
   } else if (action === 'vendor') {
     selectVendor(parts[1] ?? '');
     return;
@@ -1933,6 +2634,16 @@ function executeCommand(command: string): void {
     requestAlliance();
   } else if (action === 'travel') {
     travel(parts[1]);
+  } else if (action === 'stock') {
+    if (parts[1] === 'buy') {
+      buyStock(parts[2], parts[3]);
+    } else if (parts[1] === 'sell') {
+      sellStock(parts[2], parts[3]);
+    } else {
+      log('Invalid stock command. Use: stock buy vega_credit 1 or stock sell vega_credit 1.');
+    }
+  } else if (action === 'leverage') {
+    setStockLeverage(parts[1]);
   } else if (action === 'bargain') {
     showBargainingHelp();
   } else if (action === 'offer' || action === 'negotiate' || action === 'trade') {
@@ -1940,7 +2651,7 @@ function executeCommand(command: string): void {
   } else if (action === 'end') {
     endTurn();
   } else if (action === 'clear') {
-    logEl.innerHTML = '';
+    clearActiveLog();
   } else if (activeSidebarTab === 'bargain') {
     void submitFreeformBargainingMessage(command);
   } else {
@@ -1957,6 +2668,13 @@ manualForm.addEventListener('submit', (event) => {
   manualInput.value = '';
 
   executeCommand(command);
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && infoScreenOpen) {
+    infoScreenOpen = false;
+    renderInfoScreen();
+  }
 });
 
 selectedVendorId = locations[player.locationId].vendors[0].id;
