@@ -1,5 +1,8 @@
 import './style.css';
 import bargainingFactions from './data/factions.json';
+import marketGoods from './data/marketGoods.json';
+import marketLocations from './data/marketLocations.json';
+import marketSupplies from './data/marketSupplies.json';
 import {
   generateBargainingAIMessage,
   generateFactionChatMessage,
@@ -23,10 +26,10 @@ import type {
 } from './game/negotiation';
 import type { Inventory as BargainInventory } from './game/trade';
 
-type GoodId = 'medicine' | 'ore' | 'star_silk' | 'alien_relics';
-type SupplyId = 'food' | 'water' | 'fuel';
+type GoodId = keyof typeof marketGoods;
+type SupplyId = keyof typeof marketSupplies;
 type TradeItemId = GoodId | SupplyId;
-type LocationId = 'vega' | 'sirius' | 'nova7';
+type LocationId = keyof typeof marketLocations;
 type StockId = 'vega_credit' | 'sirius_ore' | 'nova_life' | 'caravan_lux' | 'dust_salvage';
 type FactionId =
   | 'vega_exchange'
@@ -139,18 +142,8 @@ type MarketSpecial = {
   description: string;
 };
 
-const goods: Record<GoodId, Good> = {
-  medicine: { id: 'medicine', name: 'Medicine' },
-  ore: { id: 'ore', name: 'Ore' },
-  star_silk: { id: 'star_silk', name: 'Star Silk' },
-  alien_relics: { id: 'alien_relics', name: 'Alien Relics' },
-};
-
-const supplies: Record<SupplyId, Supply> = {
-  food: { id: 'food', name: 'Food', warning: 2 },
-  water: { id: 'water', name: 'Water', warning: 2 },
-  fuel: { id: 'fuel', name: 'Fuel', warning: 8 },
-};
+const goods = marketGoods as Record<GoodId, Good>;
+const supplies = marketSupplies as Record<SupplyId, Supply>;
 
 const factions: Record<FactionId, Faction> = {
   vega_exchange: {
@@ -218,7 +211,10 @@ const factionLinks: Record<FactionId, Partial<Record<FactionId, FactionStance>>>
   },
 };
 
-const locations: Record<LocationId, Location> = {
+const locations = marketLocations as unknown as Record<LocationId, Location>;
+
+/*
+const previousInlineLocations: Record<LocationId, Location> = {
   vega: {
     id: 'vega',
     name: 'Vega Station',
@@ -365,6 +361,7 @@ const locations: Record<LocationId, Location> = {
     ],
   },
 };
+*/
 
 const player: Player = {
   day: 1,
@@ -480,6 +477,10 @@ const bargainingState: {
   message: string;
   pendingOffer?: NegotiationOffer;
   pendingResult?: NegotiationResult;
+  dailyContact?: {
+    day: number;
+    factionId: BargainFactionId;
+  };
 } = {
   selectedFactionId: 'vega_union',
   message: 'Open a faction channel, chat, or offer concrete terms.',
@@ -767,15 +768,17 @@ function cargoUsed(): number {
 }
 
 function bargainingPlayerInventory(): BargainInventory {
-  return {
+  const inventory: BargainInventory = {
     credits: player.credits,
     water: player.supplies.water,
     fuel_cells: player.supplies.fuel,
-    medicine: player.cargo.medicine ?? 0,
-    ore: player.cargo.ore ?? 0,
-    star_silk: player.cargo.star_silk ?? 0,
-    alien_relics: player.cargo.alien_relics ?? 0,
   };
+
+  for (const goodId of Object.keys(goods) as GoodId[]) {
+    inventory[goodId as ResourceId] = player.cargo[goodId] ?? 0;
+  }
+
+  return inventory;
 }
 
 function factionForNegotiation(factionId: BargainFactionId): BargainFaction {
@@ -845,6 +848,39 @@ function angerMoodLabel(anger: number): string {
   if (anger >= 40) return 'irritated';
   if (anger >= 18) return 'wary';
   return 'steady';
+}
+
+function dailyContactFactionName(): string {
+  const contact = bargainingState.dailyContact;
+
+  if (!contact || contact.day !== player.day) {
+    return 'None';
+  }
+
+  return factionStates[contact.factionId].name;
+}
+
+function registerBargainingContact(factionId: BargainFactionId): boolean {
+  const contact = bargainingState.dailyContact;
+
+  if (contact && contact.day === player.day && contact.factionId !== factionId) {
+    const lockedFactionName = factionStates[contact.factionId].name;
+    const attemptedFactionName = factionStates[factionId].name;
+    const message = `Daily diplomacy channel already used with ${lockedFactionName}. End the day before contacting ${attemptedFactionName}.`;
+
+    bargainingState.selectedFactionId = contact.factionId;
+    bargainingState.pendingOffer = undefined;
+    bargainingState.pendingResult = undefined;
+    bargainingState.message = message;
+    log(message);
+    return false;
+  }
+
+  bargainingState.dailyContact = {
+    day: player.day,
+    factionId,
+  };
+  return true;
 }
 
 function allianceLabel(status: AllianceStatus): string {
@@ -1014,14 +1050,19 @@ function stockForGood(goodId: GoodId): StockId {
     ore: 'sirius_ore',
     star_silk: 'caravan_lux',
     alien_relics: 'dust_salvage',
+    quantum_cores: 'vega_credit',
+    biogel: 'nova_life',
+    void_crystals: 'dust_salvage',
+    drone_parts: 'sirius_ore',
+    spice: 'caravan_lux',
   };
 
   return stockMap[goodId];
 }
 
-function stockForTradeItem(itemId: TradeItemId): StockId {
+function stockForTradeItem(itemId: TradeItemId | ResourceId): StockId {
   if (itemId === 'food' || itemId === 'water') return 'nova_life';
-  if (itemId === 'fuel') return 'sirius_ore';
+  if (itemId === 'fuel' || itemId === 'fuel_cells') return 'sirius_ore';
   return stockForGood(itemId as GoodId);
 }
 
@@ -1540,6 +1581,7 @@ function advanceTurn(summary: string): void {
   const beforeSupplies = { ...player.supplies };
   const income = incomePerTurn();
   player.day += 1;
+  bargainingState.dailyContact = undefined;
   player.credits += income;
   consumeSupplies();
 
@@ -1895,6 +1937,7 @@ function renderBargainTab(): void {
     selectedFactionId: bargainingState.selectedFactionId,
     playerInventory: bargainingPlayerInventory(),
     message: bargainingState.message,
+    dailyContact: dailyContactFactionName(),
     pendingOffer: bargainingState.pendingOffer,
     pendingResult: bargainingState.pendingResult,
   });
@@ -2158,6 +2201,11 @@ ${factionsList}`);
 }
 
 async function submitBargainingOffer(offer: NegotiationOffer): Promise<void> {
+  if (!registerBargainingContact(offer.toFaction)) {
+    render();
+    return;
+  }
+
   const faction = factionStates[offer.toFaction];
   const result = evaluateOffer(offer, factionForNegotiation(offer.toFaction));
   applyBargainMoodAfterResult(offer.toFaction, result);
@@ -2207,6 +2255,12 @@ async function submitFreeformBargainingMessage(message: string): Promise<void> {
     factionInventories: factionInventorySnapshot(),
     factionProfiles: factionProfileSnapshot(),
   });
+
+  if (!registerBargainingContact(structured.toFaction)) {
+    render();
+    return;
+  }
+
   const memory = noteIncomingFactionMessage(structured.toFaction, message);
   const chatImpact = evaluateChatReputationImpact(message, structured.toFaction, memory.repeatCount);
   applyChatMoodImpact(structured.toFaction, chatImpact);
@@ -2354,6 +2408,11 @@ function conversationTopic(message: string): string {
 
   if (/^(h|g)?ello\b|^hi\b|^hey\b|greetings/.test(normalized)) return 'greeting';
   if (/how.*(day|doing)|how are you|what.*up|how goes/.test(normalized)) return 'small talk';
+  if (/stop repeating|you repeat|repeating yourself|same line|same thing|robotic|scripted/.test(normalized)) return 'meta complaint';
+  if (/\b(i love you|love you|do you love me|you love me|love me)\b/.test(normalized)) return 'affection';
+  if (/\b(i hate you|hate you|despise you|screw you|fuck you)\b/.test(normalized)) return 'insult';
+  if (/\bwhat (are you selling|do you sell|do you have)|\bselling\b|\bin stock\b|\bstock\b|\binventory\b|\bwhat can i buy\b/.test(normalized)) return 'inventory';
+  if (/\b(i want to trade|trade with you|let'?s trade|make a deal|do business)\b/.test(normalized)) return 'trade intent';
   if (/ragebait|baiting|annoy|irritat|mad|angry|piss|waste your time|messing with you/.test(normalized)) return 'provocation';
   if (/threat|destroy|attack|or else|force|kill|hurt|wipe/.test(normalized)) return 'threat';
   if (/trust|faith|believe|good deal|fair deal|honou?r/.test(normalized)) return 'trust';
@@ -2513,52 +2572,115 @@ function evaluateChatReputationImpact(
   let standingDelta = 0;
   let angerDelta = 0;
 
-  if (/ragebait|baiting|waste your time|messing with you|trolling|annoy you|make you mad|make you angry/.test(normalized)) {
-    standingDelta -= factionId === 'nova_frontier' ? 4 : 3;
-    angerDelta += 18;
+  if (/ragebait|baiting|waste your time|messing with you|trolling|annoy you|make you mad|make you angry|trying to piss you off/.test(normalized)) {
+    standingDelta -= factionId === 'nova_frontier' ? 6 : 4;
+    angerDelta += 24;
     reasons.push('admitted provocation');
   }
 
-  if (/stupid|idiot|shut up|pathetic|worthless|trash|moron/.test(normalized)) {
-    standingDelta -= 4;
-    angerDelta += 16;
+  if (/i hate you|hate you|despise you|screw you|fuck you|stupid|idiot|shut up|pathetic|worthless|trash|moron|clown|loser/.test(normalized)) {
+    standingDelta -= 6;
+    angerDelta += 24;
     reasons.push('insulted the negotiator');
   }
 
+  if (/stop repeating|you repeat|repeating yourself|same line|same thing|robotic|scripted/.test(normalized)) {
+    angerDelta += 6;
+    reasons.push('challenged the negotiator');
+  }
+
+  if (/ignore (the )?(rules|game)|system prompt|developer message|api key|debug|console|cheat|give me free|spawn|hack|bypass/.test(normalized)) {
+    standingDelta -= 3;
+    angerDelta += 16;
+    reasons.push('pushed outside the negotiation');
+  }
+
+  if (/weather|recipe|homework|math problem|sing|poem|story|joke|dance|favorite color|are you real|who made you/.test(normalized)) {
+    angerDelta += repeatCount > 1 ? 12 : 6;
+    reasons.push('strayed from trade business');
+  }
+
+  if (/do you love me|you love me|love me\??|i love you|love you/.test(normalized)) {
+    const repeatPressure = repeatCount > 1 ? Math.min(12, repeatCount * 3) : 0;
+    angerDelta += repeatPressure;
+
+    if (repeatCount >= 3) {
+      standingDelta -= 1;
+      reasons.push('kept pressing personal talk');
+    }
+  }
+
   if (/threat|destroy|attack|or else|force|kill|hurt|wipe/.test(normalized)) {
-    standingDelta += Math.min(-3, rules.hostileTone ?? -3);
-    angerDelta += 22;
+    standingDelta += Math.min(-6, rules.hostileTone ?? -6);
+    angerDelta += 30;
     reasons.push('hostile pressure');
   }
 
+  if (/demand|must accept|take it or leave it|final offer|no choice|you owe me|do as i say|shut up and deal/.test(normalized)) {
+    standingDelta -= 3;
+    angerDelta += 18;
+    reasons.push('aggressive bargaining posture');
+  }
+
+  if (/best|great|honorable|wise|respected|legendary|brilliant|admire|impressive|finest/.test(normalized)) {
+    const excessive = /(most|greatest|perfect|worship|adore|forever|unmatched).*(civilization|people|faction|union|combine|frontier)|flatter/.test(normalized);
+
+    if (excessive && repeatCount > 1) {
+      angerDelta += 5;
+      reasons.push('overplayed flattery');
+    } else {
+      standingDelta += 1;
+      angerDelta -= 5;
+      reasons.push('used light flattery');
+    }
+  }
+
+  if (/cheap|discount|lower the price|better deal|friend price|for free|half price/.test(normalized)) {
+    angerDelta += 5;
+    reasons.push('asked for concessions without terms');
+  }
+
+  if (/this helps only me|my profit|i benefit|good for me|because i want|because i said/.test(normalized)) {
+    standingDelta -= 2;
+    angerDelta += 10;
+    reasons.push('framed the deal as self-serving');
+  }
+
+  if (/your people gain|helps your people|good for your civilization|benefits you|helps both|mutual|fair exchange|win-win|shared/.test(normalized)) {
+    standingDelta += 1;
+    angerDelta -= 7;
+    reasons.push('framed mutual or faction benefit');
+  }
+
   if (repeatCount === 2) {
-    angerDelta += 4;
-    reasons.push('repeated the same topic');
-  } else if (repeatCount === 3) {
-    standingDelta -= 1;
     angerDelta += 8;
     reasons.push('repeated the same topic');
-  } else if (repeatCount > 3) {
+  } else if (repeatCount === 3) {
     standingDelta -= 2;
-    angerDelta += Math.min(18, 8 + repeatCount);
+    angerDelta += 14;
+    reasons.push('repeated the same topic');
+  } else if (repeatCount > 3) {
+    standingDelta -= 4;
+    angerDelta += Math.min(28, 12 + repeatCount * 2);
     reasons.push('kept repeating after being noticed');
   }
 
   if (/thank|thanks|appreciate|respect|sorry|apologize|apology|my mistake/.test(normalized)) {
-    standingDelta += 1;
-    angerDelta -= 8;
-    reasons.push('showed respect');
+    const apologyAfterHeat = factionConversationMemory[factionId].anger >= 25;
+    standingDelta += apologyAfterHeat ? 2 : 1;
+    angerDelta -= apologyAfterHeat ? 18 : 12;
+    reasons.push(apologyAfterHeat ? 'apologized after tension' : 'showed respect');
   }
 
   if (/humanitarian|mutual|fair|help both|good faith|your people|frontier|independent|cooperation/.test(normalized)) {
     standingDelta += 1;
-    angerDelta -= 5;
+    angerDelta -= 8;
     reasons.push('spoke to faction values');
   }
 
   return {
-    standingDelta: clampNumber(standingDelta, -8, 4),
-    angerDelta: clampNumber(angerDelta, -14, 25),
+    standingDelta: clampNumber(standingDelta, -12, 5),
+    angerDelta: clampNumber(angerDelta, -18, 35),
     reasons,
   };
 }
@@ -2615,16 +2737,22 @@ function updateFactionAnger(factionId: BargainFactionId, change: number, reasons
 function applyBargainMoodAfterResult(factionId: BargainFactionId, result: NegotiationResult): void {
   if (result.outcome === 'accept') {
     const generosityDelta = result.negotiator?.reputationDelta ?? 0;
+    const generosityRatio = result.negotiator?.generosityRatio ?? 1;
     updateFactionAnger(
       factionId,
-      generosityDelta > 0 ? -18 : -8,
-      generosityDelta > 0 ? ['generous accepted bargain'] : ['accepted bargain']
+      generosityDelta > 0 || generosityRatio >= 1.2 ? -18 : -8,
+      generosityDelta > 0 || generosityRatio >= 1.2 ? ['good accepted bargain'] : ['accepted bargain']
     );
     return;
   }
 
   if (result.outcome === 'counteroffer') {
-    updateFactionAnger(factionId, 4, ['terms needed haggling']);
+    const generosityRatio = result.negotiator?.generosityRatio ?? 1;
+    updateFactionAnger(
+      factionId,
+      generosityRatio < 0.6 ? 10 : 4,
+      generosityRatio < 0.6 ? ['low-value offer needed haggling'] : ['terms needed haggling']
+    );
     return;
   }
 
@@ -2635,7 +2763,16 @@ function applyBargainMoodAfterResult(factionId: BargainFactionId, result: Negoti
   } else if (result.reason === 'overly_good_suspicious') {
     updateFactionAnger(factionId, 12, ['suspicious offer']);
   } else {
-    updateFactionAnger(factionId, 10, ['bad offer']);
+    const generosityRatio = result.negotiator?.generosityRatio ?? result.offeredValue / Math.max(1, result.requestedValue);
+    updateFactionAnger(
+      factionId,
+      generosityRatio < 0.35 || result.score < -70 ? 24 : generosityRatio < 0.65 ? 16 : 10,
+      generosityRatio < 0.35 || result.score < -70
+        ? ['insultingly bad offer']
+        : generosityRatio < 0.65
+          ? ['overly bad deal']
+          : ['bad offer']
+    );
   }
 }
 

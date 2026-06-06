@@ -1,0 +1,17 @@
+{
+  "food": {
+    "id": "food",
+    "name": "Food",
+    "warning": 2
+  },
+  "water": {
+    "id": "water",
+    "name": "Water",
+    "warning": 2
+  },
+  "fuel": {
+    "id": "fuel",
+    "name": "Fuel",
+    "warning": 8
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "medicine": {
+    "id": "medicine",
+    "name": "Medicine"
+  },
+  "ore": {
+    "id": "ore",
+    "name": "Ore"
+  },
+  "star_silk": {
+    "id": "star_silk",
+    "name": "Star Silk"
+  },
+  "alien_relics": {
+    "id": "alien_relics",
+    "name": "Alien Relics"
+  },
+  "quantum_cores": {
+    "id": "quantum_cores",
+    "name": "Quantum Cores"
+  },
+  "biogel": {
+    "id": "biogel",
+    "name": "Biogel"
+  },
+  "void_crystals": {
+    "id": "void_crystals",
+    "name": "Void Crystals"
+  },
+  "drone_parts": {
+    "id": "drone_parts",
+    "name": "Drone Parts"
+  },
+  "spice": {
+    "id": "spice",
+    "name": "Spice"
+  }
+}

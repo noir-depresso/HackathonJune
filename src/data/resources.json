@@ -33,5 +33,30 @@
     "name": "Alien Relics",
     "baseValue": 500,
     "category": "rare"
+  },
+  "quantum_cores": {
+    "name": "Quantum Cores",
+    "baseValue": 620,
+    "category": "technology"
+  },
+  "biogel": {
+    "name": "Biogel",
+    "baseValue": 205,
+    "category": "survival"
+  },
+  "void_crystals": {
+    "name": "Void Crystals",
+    "baseValue": 380,
+    "category": "rare"
+  },
+  "drone_parts": {
+    "name": "Drone Parts",
+    "baseValue": 125,
+    "category": "industry"
+  },
+  "spice": {
+    "name": "Spice",
+    "baseValue": 155,
+    "category": "luxury"
   }
 }

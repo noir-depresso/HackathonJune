@@ -22,16 +22,28 @@ Build for production:
 npm run build
 ```
 
-## API Key
+## DeepSeek API Key
 
 Put the real API key in a local `.env` file at the project root:
 
 ```bash
-OPENAI_API_KEY=sk-your-key-here
+DEEPSEEK_API_KEY=sk-your-key-here
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 VITE_BARGAINING_AI_ENDPOINT=/api/bargaining-ai
 ```
 
-Do not commit `.env`. Use `.env.example` as the template. The browser code calls `VITE_BARGAINING_AI_ENDPOINT`; the actual `OPENAI_API_KEY` should be used by a backend or serverless endpoint, not exposed directly in frontend code.
+Do not commit `.env`. Use `.env.example` as the template. Do not put leading spaces before variable names.
+
+The browser code calls `VITE_BARGAINING_AI_ENDPOINT`; the actual `DEEPSEEK_API_KEY` is read only by the local Vite API route in `vite.config.ts`. For local development and Vite preview, the correct path is:
+
+```text
+/api/bargaining-ai
+```
+
+For a deployed static site, you must provide an equivalent backend/serverless route at that same path or change `VITE_BARGAINING_AI_ENDPOINT` to the deployed backend URL.
+
+The local route calls DeepSeek's OpenAI-compatible chat completions API at `DEEPSEEK_BASE_URL + /chat/completions`.
 
 ## How To Play
 

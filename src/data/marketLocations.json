@@ -1,0 +1,157 @@
+{
+  "vega": {
+    "id": "vega",
+    "name": "Vega Station",
+    "description": "A polished trade hub orbiting a blue-white star.",
+    "governingFaction": "vega_exchange",
+    "routes": {
+      "sirius": 15,
+      "nova7": 30
+    },
+    "vendors": [
+      {
+        "id": "vega-orlan",
+        "name": "Rhea Orlan",
+        "role": "Dock Quartermaster",
+        "factionId": "vega_exchange",
+        "bio": "Runs ration locks, manifests, and certified fuel tenders.",
+        "stock": [
+          { "itemId": "food", "kind": "supply", "ask": 10 },
+          { "itemId": "water", "kind": "supply", "ask": 8 },
+          { "itemId": "fuel", "kind": "supply", "ask": 6 },
+          { "itemId": "medicine", "kind": "good", "ask": 108, "bid": 74 },
+          { "itemId": "drone_parts", "kind": "good", "ask": 142, "bid": 96 }
+        ]
+      },
+      {
+        "id": "vega-vanto",
+        "name": "Elys Vanto",
+        "role": "Luxury Cargo Curator",
+        "factionId": "free_caravans",
+        "bio": "Specializes in high-margin fabrics, relic lots, and quiet patrons.",
+        "stock": [
+          { "itemId": "star_silk", "kind": "good", "ask": 236, "bid": 168 },
+          { "itemId": "alien_relics", "kind": "good", "ask": 560, "bid": 430 },
+          { "itemId": "medicine", "kind": "good", "ask": 118, "bid": 82 },
+          { "itemId": "spice", "kind": "good", "ask": 175, "bid": 126 }
+        ]
+      },
+      {
+        "id": "vega-brass",
+        "name": "Tom Brass",
+        "role": "Hull Recycler",
+        "factionId": "dust_runners",
+        "bio": "Sells patched metal and listens for the wrong kind of opportunity.",
+        "stock": [
+          { "itemId": "ore", "kind": "good", "ask": 46, "bid": 28 },
+          { "itemId": "fuel", "kind": "supply", "ask": 7 },
+          { "itemId": "star_silk", "kind": "good", "ask": 248, "bid": 154 },
+          { "itemId": "void_crystals", "kind": "good", "ask": 410, "bid": 290 }
+        ]
+      }
+    ]
+  },
+  "sirius": {
+    "id": "sirius",
+    "name": "Sirius Outpost",
+    "description": "A mining colony with cheap ore and nervous guards.",
+    "governingFaction": "sirius_guild",
+    "routes": {
+      "vega": 15,
+      "nova7": 20
+    },
+    "vendors": [
+      {
+        "id": "sirius-dane",
+        "name": "Foreman Dane Korr",
+        "role": "Mine Contract Broker",
+        "factionId": "sirius_guild",
+        "bio": "Moves raw ore, industrial drill heads, and grudges by the ton.",
+        "stock": [
+          { "itemId": "ore", "kind": "good", "ask": 26, "bid": 18 },
+          { "itemId": "fuel", "kind": "supply", "ask": 8 },
+          { "itemId": "food", "kind": "supply", "ask": 15 },
+          { "itemId": "quantum_cores", "kind": "good", "ask": 620, "bid": 455 },
+          { "itemId": "drone_parts", "kind": "good", "ask": 118, "bid": 82 }
+        ]
+      },
+      {
+        "id": "sirius-hale",
+        "name": "Dr. Sen Hale",
+        "role": "Field Surgeon",
+        "factionId": "nova_relief",
+        "bio": "Trades vaccines, trauma kits, and practical advice.",
+        "stock": [
+          { "itemId": "medicine", "kind": "good", "ask": 138, "bid": 102 },
+          { "itemId": "water", "kind": "supply", "ask": 12 },
+          { "itemId": "food", "kind": "supply", "ask": 14 },
+          { "itemId": "biogel", "kind": "good", "ask": 225, "bid": 166 }
+        ]
+      },
+      {
+        "id": "sirius-kade",
+        "name": "Kade Wormlight",
+        "role": "Black Route Smuggler",
+        "factionId": "dust_runners",
+        "bio": "Shows up late, armed, and somehow still profitable.",
+        "stock": [
+          { "itemId": "alien_relics", "kind": "good", "ask": 690, "bid": 530 },
+          { "itemId": "star_silk", "kind": "good", "ask": 292, "bid": 214 },
+          { "itemId": "fuel", "kind": "supply", "ask": 10 },
+          { "itemId": "void_crystals", "kind": "good", "ask": 370, "bid": 286 }
+        ]
+      }
+    ]
+  },
+  "nova7": {
+    "id": "nova7",
+    "name": "Nova-7 Colony",
+    "description": "A frontier colony always short on supplies.",
+    "governingFaction": "nova_relief",
+    "routes": {
+      "vega": 30,
+      "sirius": 20
+    },
+    "vendors": [
+      {
+        "id": "nova-ilo",
+        "name": "Steward Ilo Marr",
+        "role": "Relief Steward",
+        "factionId": "nova_relief",
+        "bio": "Counts every ration crate and knows every hungry family.",
+        "stock": [
+          { "itemId": "food", "kind": "supply", "ask": 18 },
+          { "itemId": "water", "kind": "supply", "ask": 16 },
+          { "itemId": "medicine", "kind": "good", "ask": 166, "bid": 124 },
+          { "itemId": "biogel", "kind": "good", "ask": 198, "bid": 148 }
+        ]
+      },
+      {
+        "id": "nova-vessa",
+        "name": "Vessa Coil",
+        "role": "Frontier Broker",
+        "factionId": "free_caravans",
+        "bio": "Can source silk, ore, and gossip with equal confidence.",
+        "stock": [
+          { "itemId": "ore", "kind": "good", "ask": 38, "bid": 24 },
+          { "itemId": "star_silk", "kind": "good", "ask": 255, "bid": 185 },
+          { "itemId": "food", "kind": "supply", "ask": 19 },
+          { "itemId": "spice", "kind": "good", "ask": 142, "bid": 102 }
+        ]
+      },
+      {
+        "id": "nova-quill",
+        "name": "Marshal Quill",
+        "role": "Longhaul Fuel Rigger",
+        "factionId": "vega_exchange",
+        "bio": "Runs escorted tankers and keeps one eye on frontier balance sheets.",
+        "stock": [
+          { "itemId": "fuel", "kind": "supply", "ask": 10 },
+          { "itemId": "medicine", "kind": "good", "ask": 170, "bid": 128 },
+          { "itemId": "alien_relics", "kind": "good", "ask": 760, "bid": 590 },
+          { "itemId": "quantum_cores", "kind": "good", "ask": 690, "bid": 512 }
+        ]
+      }
+    ]
+  }
+}

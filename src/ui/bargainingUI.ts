@@ -17,6 +17,7 @@ export type BargainingPanelState = {
   selectedFactionId: FactionId;
   playerInventory: ResourceBundle;
   message: string;
+  dailyContact: string;
   pendingOffer?: NegotiationOffer;
   pendingResult?: NegotiationResult;
 };
@@ -52,6 +53,7 @@ export function renderBargainingPanel(state: BargainingPanelState): string {
       <div class="stat-row"><span>Trust</span><strong>${selectedFaction.trust}</strong></div>
       <div class="stat-row"><span>Anger</span><strong>${selectedFaction.anger} / 100</strong></div>
       <div class="stat-row"><span>Mood</span><strong>${selectedFaction.mood}</strong></div>
+      <div class="stat-row"><span>Today Channel</span><strong>${state.dailyContact}</strong></div>
 
       <div class="bargain-grid">
         <label>

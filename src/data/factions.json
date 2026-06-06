@@ -28,9 +28,9 @@
     "relationshipWithPlayer": 20,
     "alliances": ["nova_frontier"],
     "enemies": ["eclipse_combine"],
-    "likes": ["water", "medicine"],
-    "dislikes": ["alien_relics"],
-    "urgentNeeds": ["medicine"],
+    "likes": ["water", "medicine", "drone_parts"],
+    "dislikes": ["alien_relics", "void_crystals"],
+    "urgentNeeds": ["medicine", "drone_parts"],
     "tabooResources": [],
     "bargainingStyle": "fair",
     "philosophy": {
@@ -98,7 +98,12 @@
       "ore": 25,
       "fuel_cells": 30,
       "star_silk": 6,
-      "alien_relics": 1
+      "alien_relics": 1,
+      "quantum_cores": 3,
+      "biogel": 4,
+      "void_crystals": 0,
+      "drone_parts": 24,
+      "spice": 6
     }
   },
   "eclipse_combine": {
@@ -131,7 +136,7 @@
     "relationshipWithPlayer": -10,
     "alliances": [],
     "enemies": ["vega_union", "nova_frontier"],
-    "likes": ["credits", "ore", "fuel_cells", "alien_relics"],
+    "likes": ["credits", "ore", "fuel_cells", "alien_relics", "quantum_cores"],
     "dislikes": ["water"],
     "urgentNeeds": ["fuel_cells"],
     "tabooResources": [],
@@ -201,7 +206,12 @@
       "ore": 160,
       "fuel_cells": 16,
       "star_silk": 12,
-      "alien_relics": 5
+      "alien_relics": 5,
+      "quantum_cores": 14,
+      "biogel": 1,
+      "void_crystals": 3,
+      "drone_parts": 18,
+      "spice": 2
     }
   },
   "nova_frontier": {
@@ -234,8 +244,8 @@
     "relationshipWithPlayer": 5,
     "alliances": ["vega_union"],
     "enemies": [],
-    "likes": ["water", "fuel_cells", "ore"],
-    "dislikes": ["star_silk"],
+    "likes": ["water", "fuel_cells", "ore", "biogel"],
+    "dislikes": ["star_silk", "spice"],
     "urgentNeeds": ["water"],
     "tabooResources": ["alien_relics"],
     "bargainingStyle": "need_driven",
@@ -304,7 +314,12 @@
       "ore": 50,
       "fuel_cells": 20,
       "star_silk": 2,
-      "alien_relics": 0
+      "alien_relics": 0,
+      "quantum_cores": 0,
+      "biogel": 16,
+      "void_crystals": 0,
+      "drone_parts": 5,
+      "spice": 1
     }
   }
 }

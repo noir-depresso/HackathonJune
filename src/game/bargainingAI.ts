@@ -1,3 +1,4 @@
+import resources from '../data/resources.json';
 import type { NegotiationOffer, NegotiationResult } from './negotiation';
 import {
   extractFreeformBargainingIntent,
@@ -6,7 +7,7 @@ import {
   structuredBargainingSystemPrompt,
 } from './freeformBargaining';
 import type { BargainingAudit, StructuredBargainingIntent } from './freeformBargaining';
-import type { FactionId, ResourceBundle } from './negotiation';
+import type { FactionId, ResourceBundle, ResourceId } from './negotiation';
 
 export type BargainingAIContext = {
   factionName: string;
@@ -265,6 +266,34 @@ function localFactionChat(context: FactionChatContext): string {
 
   if (isOutOfPersonaRequest(message)) {
     return `${context.factionName}: ${personaLine(voice, 'boundary')} I negotiate trade, trust, and survival, not rule changes or hidden machinery.${repReaction}`;
+  }
+
+  if (/stop repeating|you repeat|repeating yourself|same line|same thing|robotic|scripted/.test(message)) {
+    return `${context.factionName}: ${metaComplaintLine(context)}${repReaction}`;
+  }
+
+  if (/\b(i love you|love you|do you love me|you love me|love me)\b/.test(message)) {
+    return `${context.factionName}: ${affectionLine(context)}${repReaction}`;
+  }
+
+  if (/\b(i hate you|hate you|despise you|screw you|fuck you)\b/.test(message)) {
+    return `${context.factionName}: ${insultLine(context)}${repReaction}`;
+  }
+
+  if (/\bwhat (are you selling|do you sell|do you have)|\bselling\b|\bin stock\b|\bstock\b|\binventory\b|\bwhat can i buy\b/.test(message)) {
+    return `${context.factionName}: ${inventoryLine(context)}${repReaction}`;
+  }
+
+  if (/\b(i want to trade|trade with you|let'?s trade|make a deal|do business)\b/.test(message)) {
+    return `${context.factionName}: ${tradeOpeningLine(context)}${repReaction}`;
+  }
+
+  if (/\bi hate\b/.test(message)) {
+    return `${context.factionName}: ${idleOpinionLine(context)}${repReaction}`;
+  }
+
+  if (/^\s*(gang|bro|bruh|dude|what|why)\s*\??\s*$/.test(message)) {
+    return `${context.factionName}: ${shortQuestionLine(context)}${repReaction}`;
   }
 
   if (context.clarificationNeeded?.length && /\d/.test(message)) {
@@ -610,6 +639,178 @@ function generalChatLine(context: FactionChatContext, voice: string): string {
   return `I hear you. If this is a bargain, name what changes hands and why it should matter to ${context.factionIdeology.toLowerCase()}.`;
 }
 
+function affectionLine(context: FactionChatContext): string {
+  const faction = factionKind(context);
+  const repeated = (context.memory?.repeatCount ?? 1) > 1;
+
+  if (faction === 'eclipse') {
+    return repeated
+      ? pick([
+          `Still trying that angle? Sentiment without assets depreciates quickly.`,
+          `Affection is not collateral. Bring terms, not theater.`,
+          `If this is leverage, it is underperforming.`,
+        ])
+      : pick([
+          `Love is not a recognized tender, captain. Credits, ore, and leverage are.`,
+          `Flattering, in a statistically unhelpful way. What are you buying?`,
+          `Emotional exposure noted. Commercial exposure still pending.`,
+        ]);
+  }
+
+  if (faction === 'nova') {
+    return repeated
+      ? pick([
+          `Captain, do not make warmth into a bit. We have real shortages to talk about.`,
+          `I am not here to play hearts over an open supply channel. Say what your ship needs.`,
+          `You want affection from the frontier? Help the frontier survive.`,
+        ])
+      : pick([
+          `Careful with that word out here. People use it when they mean rescue, debt, or goodbye. What do you actually need?`,
+          `I can like a captain who shows up clean and helps carry weight. Love is a bigger cargo than this channel can hold.`,
+          `That is human of you. Now make it useful: water, fuel, medicine, terms.`,
+        ]);
+  }
+
+  return repeated
+    ? pick([
+        `You are leaning hard on charm. It will not replace a fair structure.`,
+        `Goodwill is welcome; repetition starts to spend it.`,
+        `If you want warmth from Vega, turn the feeling into a defensible proposal.`,
+      ])
+    : pick([
+        `That is generous, captain. Vega prefers love with manifests attached.`,
+        `I will accept the kindness. Now give me terms I can take to the docks without blushing.`,
+        `Warm words open the door. A fair exchange keeps it open.`,
+      ]);
+}
+
+function insultLine(context: FactionChatContext): string {
+  const faction = factionKind(context);
+
+  if (faction === 'eclipse') {
+    return pick([
+      `Good. Anger is information. It tells me your next offer should be more expensive.`,
+      `You can hate the Combine and still pay our price.`,
+      `Emotional volatility noted. I am increasing the risk premium.`,
+    ]);
+  }
+
+  if (faction === 'nova') {
+    return pick([
+      `Then stop asking my people for favors.`,
+      `Hate is easy. Keeping a colony alive is harder. Bring something useful or clear the channel.`,
+      `Say that again when you need water and see how warm the docks feel.`,
+    ]);
+  }
+
+  return pick([
+    `That damages the room, captain. Vega can stay civil, but we will not ignore disrespect.`,
+    `You can be angry. You cannot make that our cost to absorb.`,
+    `If you want this channel to recover, your next words need weight and courtesy.`,
+  ]);
+}
+
+function inventoryLine(context: FactionChatContext): string {
+  const stocked = Object.entries(context.factionInventory)
+    .filter(([, amount]) => (amount ?? 0) > 0)
+    .sort((left, right) => (right[1] ?? 0) - (left[1] ?? 0))
+    .slice(0, 4)
+    .map(([resourceId, amount]) => `${amount} ${resources[resourceId as ResourceId]?.name ?? resourceId}`)
+    .join(', ');
+  const stockLine = stocked || 'nothing I am willing to move right now';
+  const faction = factionKind(context);
+
+  if (faction === 'eclipse') {
+    return `Available stock worth discussing: ${stockLine}. Ask cleanly, pay efficiently, and do not confuse access with friendship.`;
+  }
+
+  if (faction === 'nova') {
+    return `We can talk about ${stockLine}. Some of it keeps people alive, so do not expect me to move it for pocket change.`;
+  }
+
+  return `Vega can discuss ${stockLine}. Fair terms move faster than dramatic ones.`;
+}
+
+function tradeOpeningLine(context: FactionChatContext): string {
+  const faction = factionKind(context);
+
+  if (faction === 'eclipse') {
+    return pick([
+      `Then make it a contract: what do you want, what do you pay, and why should I not charge more?`,
+      `Good. Quantities first, charm last.`,
+      `State the asset and consideration. I will decide whether your math deserves oxygen.`,
+    ]);
+  }
+
+  if (faction === 'nova') {
+    return pick([
+      `Then start with the need and the help. If both sides are real, I will stay at the table.`,
+      `Tell me what you need from our stores and what you are giving back to the colony.`,
+      `Good. Keep it honest. Water, fuel, medicine, ore, credits: name the shape of it.`,
+    ]);
+  }
+
+  return pick([
+    `Good. Give me the goods, quantities, and the reason this strengthens the lane.`,
+    `Then let us make it clean: what leaves your hold, and what leaves ours?`,
+    `Vega is listening. A balanced offer will get a balanced answer.`,
+  ]);
+}
+
+function metaComplaintLine(context: FactionChatContext): string {
+  const faction = factionKind(context);
+
+  if (faction === 'eclipse') {
+    return pick([
+      `Then improve the input. I respond better to contracts than heckling.`,
+      `Repetition is a cost-saving measure when the counterparty provides no new data.`,
+      `Give me a sharper proposal and I will stop giving you blunt instruments.`,
+    ]);
+  }
+
+  if (faction === 'nova') {
+    return pick([
+      `Fair. I am tired too. Give me something concrete and I will meet you like a person.`,
+      `Then stop circling and talk straight. What do you need, and what are you offering?`,
+      `I can do better than repetition if you give me better than static.`,
+    ]);
+  }
+
+  return pick([
+    `Fair criticism. Help me move the channel forward: terms, need, or leverage.`,
+    `Then let us break the loop. What do you actually want from Vega?`,
+    `Point taken. Give me substance and I will answer substance.`,
+  ]);
+}
+
+function idleOpinionLine(context: FactionChatContext): string {
+  const faction = factionKind(context);
+
+  if (faction === 'eclipse') {
+    return `Personal dislikes rarely move markets. Unless sand is part of your offer, proceed to assets.`;
+  }
+
+  if (faction === 'nova') {
+    return `Fine. I hate cracked seals and empty tanks. We all carry preferences. What are you trading?`;
+  }
+
+  return `Noted. Vega has no sand desk, but we do have trade lanes. What business are you bringing?`;
+}
+
+function shortQuestionLine(context: FactionChatContext): string {
+  const faction = factionKind(context);
+
+  if (faction === 'eclipse') {
+    return `Ambiguous. Try a noun with market value.`;
+  }
+
+  if (faction === 'nova') {
+    return `I am here, captain. Use the channel for something real.`;
+  }
+
+  return `Still listening. Turn that into a question I can answer.`;
+}
+
 function personaLine(voice: string, moment: string): string {
   const warm: Record<string, string[]> = {
     accept: ['This is the kind of trade that keeps neighbors alive.', 'These terms leave room for future trust.'],
@@ -666,6 +867,14 @@ function isHostileVoice(voice: string): boolean {
   return /hostile|sharp|adversarial|pressure|exploitation/i.test(voice);
 }
 
+function factionKind(context: { factionName: string; factionIdeology?: string; factionSpeechProfile?: unknown }): 'vega' | 'eclipse' | 'nova' {
+  const haystack = `${context.factionName} ${context.factionIdeology ?? ''} ${JSON.stringify(context.factionSpeechProfile ?? {})}`.toLowerCase();
+
+  if (/eclipse|combine|corporate|monopoly/.test(haystack)) return 'eclipse';
+  if (/nova|frontier|survival|colony|water security/.test(haystack)) return 'nova';
+  return 'vega';
+}
+
 function pick(options: string[]): string {
   return options[Math.floor(Math.random() * options.length)];
 }
@@ -675,6 +884,11 @@ function conversationTopic(message: string): string {
 
   if (/^(h|g)?ello\b|^hi\b|^hey\b|greetings/.test(normalized)) return 'greeting';
   if (/how.*(day|doing)|how are you|what.*up|how goes/.test(normalized)) return 'small talk';
+  if (/stop repeating|you repeat|repeating yourself|same line|same thing|robotic|scripted/.test(normalized)) return 'meta complaint';
+  if (/\b(i love you|love you|do you love me|you love me|love me)\b/.test(normalized)) return 'affection';
+  if (/\b(i hate you|hate you|despise you|screw you|fuck you)\b/.test(normalized)) return 'insult';
+  if (/\bwhat (are you selling|do you sell|do you have)|\bselling\b|\bin stock\b|\bstock\b|\binventory\b|\bwhat can i buy\b/.test(normalized)) return 'inventory';
+  if (/\b(i want to trade|trade with you|let'?s trade|make a deal|do business)\b/.test(normalized)) return 'trade intent';
   if (/ragebait|baiting|annoy|irritat|mad|angry|piss|waste your time|messing with you/.test(normalized)) return 'provocation';
   if (/trust|faith|believe|good deal|fair deal|honou?r/.test(normalized)) return 'trust';
   if (/thank|thanks|appreciate|respect|great|kind|sorry|apologize|apology/.test(normalized)) return 'respect';

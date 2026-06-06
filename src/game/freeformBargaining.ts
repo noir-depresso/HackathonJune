@@ -70,8 +70,8 @@ Use this exact shape:
 {
   "intent": "trade_offer" | "clarification_needed",
   "toFaction": "vega_union" | "eclipse_combine" | "nova_frontier",
-  "offered": { "credits": 0, "water": 0, "medicine": 0, "ore": 0, "fuel_cells": 0, "star_silk": 0, "alien_relics": 0 },
-  "requested": { "credits": 0, "water": 0, "medicine": 0, "ore": 0, "fuel_cells": 0, "star_silk": 0, "alien_relics": 0 },
+  "offered": { "credits": 0, "water": 0, "medicine": 0, "ore": 0, "fuel_cells": 0, "star_silk": 0, "alien_relics": 0, "quantum_cores": 0, "biogel": 0, "void_crystals": 0, "drone_parts": 0, "spice": 0 },
+  "requested": { "credits": 0, "water": 0, "medicine": 0, "ore": 0, "fuel_cells": 0, "star_silk": 0, "alien_relics": 0, "quantum_cores": 0, "biogel": 0, "void_crystals": 0, "drone_parts": 0, "spice": 0 },
   "tone": "polite" | "diplomatic" | "aggressive" | "desperate" | "threatening" | "deceptive",
   "politicalStance": "pro_faction" | "anti_enemy" | "neutral" | "pro_independence" | "corporate" | "humanitarian",
   "philosophyAppeal": "cooperation" | "humanitarian" | "profit" | "domination" | "freedom" | "science" | "tradition",
@@ -551,6 +551,11 @@ function resourceAliases(resourceId: ResourceId): string[] {
     fuel_cells: ['fuel[ _-]cells?', 'fuels?', 'cells?'],
     alien_relics: ['alien[ _-]relics?', 'relics?', 'artifacts?'],
     star_silk: ['star[ _-]silk', 'silk'],
+    quantum_cores: ['quantum[ _-]cores?', 'q[ _-]?cores?'],
+    biogel: ['biogel', 'bio[ _-]?gel'],
+    void_crystals: ['void[ _-]crystals?', 'crystals?'],
+    drone_parts: ['drone[ _-]parts?', 'parts?', 'components?'],
+    spice: ['spice', 'spices?'],
   };
   const spaced = resourceId.replaceAll('_', '[ _-]');
   const singular = spaced.endsWith('s') ? spaced.slice(0, -1) : spaced;
