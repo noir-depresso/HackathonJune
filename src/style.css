@@ -706,6 +706,146 @@ input {
   margin-top: 10px;
 }
 
+.property-panel,
+.map-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.property-section-title {
+  padding: 0 12px;
+}
+
+.property-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.property-card,
+.map-card {
+  border: 1px solid #444;
+  background: #111;
+  padding: 12px;
+}
+
+.property-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.property-head strong {
+  margin-right: auto;
+}
+
+.property-line {
+  color: #bcbcbc;
+  font-size: 16px;
+  line-height: 1.45;
+  margin-top: 5px;
+}
+
+.property-badge {
+  border: 1px solid #555;
+  background: #181818;
+  color: #8ff3ff;
+  padding: 3px 6px;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.property-badge.warning {
+  border-color: #ffef9a;
+  color: #ffef9a;
+}
+
+.property-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.property-action-button {
+  border: 1px solid #555;
+  background: #181818;
+  color: #eeeeee;
+  cursor: pointer;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 15px;
+}
+
+.property-action-button:hover {
+  border-color: #8ff3ff;
+  color: #ffffff;
+  background: #222;
+}
+
+.property-action-button.sell {
+  border-color: #7d4545;
+  color: #ffcccc;
+}
+
+.map-card {
+  margin: 0 12px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.route-map {
+  display: block;
+  width: 100%;
+  min-height: 360px;
+}
+
+.map-background {
+  fill: #080808;
+}
+
+.map-route {
+  stroke: #555;
+  stroke-width: 3;
+}
+
+.map-node {
+  cursor: pointer;
+}
+
+.map-node circle {
+  fill: #181818;
+  stroke: #777;
+  stroke-width: 3;
+}
+
+.map-node.connected circle {
+  stroke: #8ff3ff;
+}
+
+.map-node.current circle {
+  fill: #2d2814;
+  stroke: #ffef9a;
+}
+
+.map-node text {
+  fill: #eeeeee;
+  font-size: 14px;
+  font-family: "Courier New", "MS Gothic", "Consolas", monospace;
+}
+
+.map-node:hover circle {
+  fill: #222;
+  stroke: #ffffff;
+}
+
+.map-actions {
+  padding: 0 12px 12px;
+}
+
 @media (max-width: 850px) {
   .era-window {
     grid-template-rows: 44px 1fr 260px;

@@ -3,6 +3,7 @@ import bargainingFactions from './data/factions.json';
 import marketGoods from './data/marketGoods.json';
 import marketLocations from './data/marketLocations.json';
 import marketSupplies from './data/marketSupplies.json';
+import territoryData from './data/territories.json';
 import {
   generateBargainingAIMessage,
   generateFactionChatMessage,
@@ -40,9 +41,11 @@ type FactionId =
 type AllianceStatus = 'none' | 'trade_pact' | 'alliance';
 type FactionStance = 'ally' | 'friendly' | 'neutral' | 'rival' | 'hostile';
 type SidebarTab = 'market' | 'ledger' | 'bargain';
-type LogTab = 'conversation' | 'account' | 'stocks';
+type LogTab = 'conversation' | 'account' | 'stocks' | 'property' | 'map';
 type CommandMode = 'root' | 'bargainTargets';
 type StockLeverage = 1 | 2 | 3;
+type PropertyOwner = 'player' | BargainFactionId;
+type TerritoryType = 'mining' | 'logistics' | 'water';
 
 type Good = {
   id: GoodId;
@@ -105,6 +108,18 @@ type StockPosition = {
   shares: number;
   averagePrice: number;
   averageLeverage: number;
+};
+
+type Territory = {
+  name: string;
+  owner: PropertyOwner;
+  type: TerritoryType;
+  basePrice: number;
+  resourceOutput: Record<string, number>;
+  strategicValue: number;
+  isForSale: boolean;
+  leaseAllowed: boolean;
+  isLeased?: boolean;
 };
 
 type Faction = {
@@ -489,6 +504,8 @@ const bargainingState: {
 
 const factionIds = Object.keys(factions) as FactionId[];
 const stockIds = Object.keys(stocks) as StockId[];
+const territories = structuredClone(territoryData) as Record<string, Territory>;
+const territoryIds = Object.keys(territories);
 
 let gameOver = false;
 let gameOverReason = '';
@@ -516,6 +533,18 @@ const stockMarketBias: Record<StockId, number> = {
   caravan_lux: 0,
   dust_salvage: 0,
 };
+
+const propertyOwnerMainFaction: Record<BargainFactionId, FactionId> = {
+  vega_union: 'vega_exchange',
+  eclipse_combine: 'sirius_guild',
+  nova_frontier: 'nova_relief',
+};
+
+const locationMapPositions: Record<LocationId, { x: number; y: number }> = {
+  vega: { x: 140, y: 92 },
+  sirius: { x: 410, y: 112 },
+  nova7: { x: 275, y: 270 },
+} as Record<LocationId, { x: number; y: number }>;
 
 const app = document.querySelector<HTMLDivElement>('#app');
 
@@ -609,6 +638,8 @@ app.innerHTML = `
             <li>COMMS shows story, chat, events, and negotiation messages.</li>
             <li>ACCOUNT records every mechanical change: credits, cargo, supplies, reputation, alliances, and completed bargains.</li>
             <li>STOCKS shows market prices, line graphs, daily gains/losses, portfolio value, and buy/sell controls.</li>
+            <li>PROPERTY manages territory holdings, leases, and daily strategic income.</li>
+            <li>MAP shows known routes and lets you travel to connected ports.</li>
             <li>MARKET selects vendors and shows prices. LEDGER shows faction politics. BARGAIN opens faction negotiation.</li>
           </ul>
         </section>
@@ -634,7 +665,7 @@ app.innerHTML = `
 
         <section>
           <h2>Useful Commands</h2>
-          <p>Try: status, market, ledger, stocks, bargain, buy ore 1, sell ore 1, stock buy vega_credit 1, leverage 2, vendor vega-vanto, gift 100, travel sirius, end.</p>
+          <p>Try: status, market, ledger, stocks, property list, map, bargain, buy ore 1, sell ore 1, stock buy vega_credit 1, leverage 2, vendor vega-vanto, gift 100, travel sirius, end.</p>
           <p>Natural offer example: I offer Nova 500 credits for 10 fuel as humanitarian support.</p>
         </section>
       </div>
@@ -678,16 +709,19 @@ const accountScreenEl = document.querySelector<HTMLElement>('#account-screen')!;
 const accountLogBodyEl = document.querySelector<HTMLDivElement>('#account-log-body')!;
 
 tabMarketButton.addEventListener('click', () => {
+  activeLogTab = 'conversation';
   activeSidebarTab = 'market';
   render();
 });
 
 tabLedgerButton.addEventListener('click', () => {
+  activeLogTab = 'conversation';
   activeSidebarTab = 'ledger';
   render();
 });
 
 tabBargainButton.addEventListener('click', () => {
+  activeLogTab = 'conversation';
   bargainingState.selectedFactionId = factionToBargainFaction[currentVendor().factionId];
   activeSidebarTab = 'bargain';
   render();
@@ -1062,7 +1096,7 @@ function influenceStock(stockId: StockId, percent: number): void {
   stockMarketBias[stockId] += percent;
 }
 
-function influenceFactionStocks(factionId: FactionId, percent: number): void {
+function stockForFaction(factionId: FactionId): StockId {
   const stockMap: Record<FactionId, StockId> = {
     vega_exchange: 'vega_credit',
     sirius_guild: 'sirius_ore',
@@ -1071,7 +1105,11 @@ function influenceFactionStocks(factionId: FactionId, percent: number): void {
     dust_runners: 'dust_salvage',
   };
 
-  influenceStock(stockMap[factionId], percent);
+  return stockMap[factionId];
+}
+
+function influenceFactionStocks(factionId: FactionId, percent: number): void {
+  influenceStock(stockForFaction(factionId), percent);
 }
 
 function stockForGood(goodId: GoodId): StockId {
@@ -1277,8 +1315,193 @@ function specialBadge(vendorId: string, itemId: TradeItemId): string {
   return activeSpecial.type === 'discount' ? 'FLASH SALE' : 'HIGH DEMAND';
 }
 
+function territoryTypeLabel(type: TerritoryType): string {
+  if (type === 'mining') return 'Mining Claim';
+  if (type === 'logistics') return 'Logistics Depot';
+  return 'Water Rights';
+}
+
+function propertyOwnerLabel(owner: PropertyOwner): string {
+  if (owner === 'player') return 'You';
+  return factionStates[owner]?.name ?? owner;
+}
+
+function resourceOutputLabel(output: Record<string, number>): string {
+  return Object.entries(output)
+    .map(([resourceId, amount]) => `${resourceId.replaceAll('_', ' ')} +${amount}`)
+    .join(', ');
+}
+
+function territoryMaintenance(territory: Territory): number {
+  const leaseCost = territory.isLeased ? 12 : 0;
+  return Math.max(1, Math.round(territory.basePrice * 0.035) + leaseCost);
+}
+
+function territoryGrossIncome(territory: Territory): number {
+  const leaseBoost = territory.isLeased ? 1.2 : 1;
+  return Math.round(territory.strategicValue * leaseBoost);
+}
+
+function territoryNetIncome(territory: Territory): number {
+  return territoryGrossIncome(territory) - territoryMaintenance(territory);
+}
+
+function propertyIncomePerTurn(): number {
+  return territoryIds.reduce((total, territoryId) => {
+    const territory = territories[territoryId];
+    return territory.owner === 'player' ? total + territoryNetIncome(territory) : total;
+  }, 0);
+}
+
 function incomePerTurn(): number {
-  return 120 + countAlliances('trade_pact') * 25 + countAlliances('alliance') * 60;
+  return 120 + countAlliances('trade_pact') * 25 + countAlliances('alliance') * 60 + propertyIncomePerTurn();
+}
+
+function showPropertyList(): void {
+  activeLogTab = 'property';
+  renderPropertyPanel();
+}
+
+function inspectProperty(territoryId: string): void {
+  const territory = territories[territoryId];
+
+  if (!territory) {
+    log(`Property not found: ${territoryId}`);
+    return;
+  }
+
+  activeLogTab = 'conversation';
+  log(
+    `PROPERTY REPORT - ${territory.name}
+Type: ${territoryTypeLabel(territory.type)}
+Owner: ${propertyOwnerLabel(territory.owner)}
+Price: ${territory.basePrice}
+Strategic value: ${territory.strategicValue}
+Gross income: ${territoryGrossIncome(territory)}
+Maintenance: ${territoryMaintenance(territory)}
+Net income: ${territoryNetIncome(territory)}
+Output: ${resourceOutputLabel(territory.resourceOutput)}
+For sale: ${territory.isForSale ? 'Yes' : 'No'}
+Lease allowed: ${territory.leaseAllowed ? 'Yes' : 'No'}
+Leased: ${territory.isLeased ? 'Yes' : 'No'}`
+  );
+}
+
+function buyProperty(territoryId: string): void {
+  const territory = territories[territoryId];
+
+  if (!territory) {
+    log(`Property not found: ${territoryId}`);
+    return;
+  }
+
+  if (!territory.isForSale) {
+    log(`${territory.name} is not for sale right now.`);
+    return;
+  }
+
+  if (territory.owner === 'player') {
+    log(`You already own ${territory.name}.`);
+    return;
+  }
+
+  if (player.credits < territory.basePrice) {
+    log(`Not enough credits to buy ${territory.name}. Need ${territory.basePrice}.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  const previousOwner = territory.owner;
+  player.credits -= territory.basePrice;
+  territory.owner = 'player';
+  territory.isForSale = false;
+  influenceStock(stockForPropertyOwner(previousOwner), -0.004);
+  accountLog(`PROPERTY BUY | ${territory.name}. Credits ${beforeCredits} -> ${player.credits}.`);
+  log(`You bought ${territory.name} for ${territory.basePrice} credits.`);
+  renderPropertyPanel();
+}
+
+function sellProperty(territoryId: string): void {
+  const territory = territories[territoryId];
+
+  if (!territory) {
+    log(`Property not found: ${territoryId}`);
+    return;
+  }
+
+  if (territory.owner !== 'player') {
+    log(`You do not own ${territory.name}.`);
+    return;
+  }
+
+  const beforeCredits = player.credits;
+  const salePrice = Math.max(1, Math.round(territory.basePrice * 0.8));
+  player.credits += salePrice;
+  territory.owner = 'vega_union';
+  territory.isForSale = true;
+  territory.isLeased = false;
+  influenceStock('vega_credit', 0.004);
+  accountLog(`PROPERTY SELL | ${territory.name}. Credits ${beforeCredits} -> ${player.credits}.`);
+  log(`You sold ${territory.name} for ${salePrice} credits.`);
+  renderPropertyPanel();
+}
+
+function leaseProperty(territoryId: string): void {
+  const territory = territories[territoryId];
+
+  if (!territory) {
+    log(`Property not found: ${territoryId}`);
+    return;
+  }
+
+  if (territory.owner !== 'player') {
+    log(`You do not own ${territory.name}.`);
+    return;
+  }
+
+  if (!territory.leaseAllowed) {
+    log(`${territory.name} cannot be leased right now.`);
+    return;
+  }
+
+  if (territory.isLeased) {
+    log(`${territory.name} is already leased.`);
+    return;
+  }
+
+  territory.isLeased = true;
+  accountLog(`PROPERTY LEASE | ${territory.name}. Expected net income now ${territoryNetIncome(territory)} per day.`);
+  log(`You leased ${territory.name}; yield rises, but maintenance increases too.`);
+  renderPropertyPanel();
+}
+
+function releaseProperty(territoryId: string): void {
+  const territory = territories[territoryId];
+
+  if (!territory) {
+    log(`Property not found: ${territoryId}`);
+    return;
+  }
+
+  if (territory.owner !== 'player') {
+    log(`You do not own ${territory.name}.`);
+    return;
+  }
+
+  if (!territory.isLeased) {
+    log(`${territory.name} is not leased.`);
+    return;
+  }
+
+  territory.isLeased = false;
+  accountLog(`PROPERTY RELEASE | ${territory.name}. Expected net income now ${territoryNetIncome(territory)} per day.`);
+  log(`You released the lease on ${territory.name}.`);
+  renderPropertyPanel();
+}
+
+function stockForPropertyOwner(owner: PropertyOwner): StockId {
+  if (owner === 'player') return 'vega_credit';
+  return stockForFaction(propertyOwnerMainFaction[owner]);
 }
 
 function loseCredits(amount: number): number {
@@ -1650,6 +1873,16 @@ function renderLogPanel(): void {
     return;
   }
 
+  if (activeLogTab === 'property') {
+    renderPropertyPanel();
+    return;
+  }
+
+  if (activeLogTab === 'map') {
+    renderMapPanel();
+    return;
+  }
+
   const entries = activeLogTab === 'conversation' ? conversationEntries : accountEntries;
   logEl.innerHTML = entries
     .map((entry) => `<div class="log-entry">${escapeHtml(entry)}</div>`)
@@ -1749,6 +1982,163 @@ function renderStockMarketPanel(): void {
   });
 }
 
+function renderPropertyPanel(): void {
+  const ownedTerritories = territoryIds
+    .map((territoryId) => ({ id: territoryId, territory: territories[territoryId] }))
+    .filter(({ territory }) => territory.owner === 'player');
+  const availableTerritories = territoryIds
+    .map((territoryId) => ({ id: territoryId, territory: territories[territoryId] }))
+    .filter(({ territory }) => territory.owner !== 'player' && territory.isForSale);
+
+  const ownedMarkup = ownedTerritories.length > 0
+    ? ownedTerritories
+        .map(({ id, territory }) => {
+          const leasedBadge = territory.isLeased ? '<span class="property-badge warning">LEASED</span>' : '';
+          return `
+            <article class="property-card">
+              <div class="property-head">
+                <strong>${territory.name}</strong>
+                <span class="property-badge">${territoryTypeLabel(territory.type)}</span>
+                ${leasedBadge}
+              </div>
+              <div class="property-line">Output: ${resourceOutputLabel(territory.resourceOutput)}</div>
+              <div class="property-line">Gross ${territoryGrossIncome(territory)} | Maint ${territoryMaintenance(territory)} | Net ${territoryNetIncome(territory)} / day</div>
+              <div class="property-actions">
+                <button class="property-action-button" data-command="property inspect ${id}">Inspect</button>
+                ${territory.leaseAllowed && !territory.isLeased ? `<button class="property-action-button" data-command="property lease ${id}">Lease</button>` : ''}
+                ${territory.isLeased ? `<button class="property-action-button" data-command="property release ${id}">Release</button>` : ''}
+                <button class="property-action-button sell" data-command="property sell ${id}">Sell</button>
+              </div>
+            </article>
+          `;
+        })
+        .join('')
+    : '<div class="log-entry">No properties owned yet.</div>';
+
+  const availableMarkup = availableTerritories.length > 0
+    ? availableTerritories
+        .map(({ id, territory }) => {
+          return `
+            <article class="property-card">
+              <div class="property-head">
+                <strong>${territory.name}</strong>
+                <span class="property-badge">${territoryTypeLabel(territory.type)}</span>
+              </div>
+              <div class="property-line">Owner: ${propertyOwnerLabel(territory.owner)} | Price ${territory.basePrice} credits</div>
+              <div class="property-line">Output: ${resourceOutputLabel(territory.resourceOutput)} | Net ${territoryNetIncome(territory)} / day</div>
+              <div class="property-actions">
+                <button class="property-action-button" data-command="property inspect ${id}">Inspect</button>
+                <button class="property-action-button" data-command="property buy ${id}">Buy</button>
+              </div>
+            </article>
+          `;
+        })
+        .join('')
+    : '<div class="log-entry">No properties are currently for sale.</div>';
+
+  logEl.innerHTML = `
+    <div class="property-panel">
+      <div class="stock-market-head">
+        <div>
+          <div class="box-subtitle">PROPERTY EXCHANGE</div>
+          <div class="ledger-copy">Territory leases and strategic holdings add daily income without changing the current market, ledger, or bargaining screens.</div>
+        </div>
+        <div class="stock-summary">
+          <div class="stat-row"><span>Credits</span><strong>${player.credits}</strong></div>
+          <div class="stat-row"><span>Owned</span><strong>${ownedTerritories.length}</strong></div>
+          <div class="stat-row"><span>Net / Day</span><strong>${propertyIncomePerTurn()}</strong></div>
+        </div>
+      </div>
+      <div class="box-subtitle property-section-title">OWNED HOLDINGS</div>
+      <div class="property-list">${ownedMarkup}</div>
+      <div class="box-subtitle property-section-title">FOR SALE</div>
+      <div class="property-list">${availableMarkup}</div>
+    </div>
+  `;
+
+  bindLogCommandButtons();
+}
+
+function renderMapPanel(): void {
+  const locationIds = Object.keys(locations) as LocationId[];
+  const routeLines = locationIds
+    .flatMap((locationId) => {
+      const start = locationMapPositions[locationId];
+
+      return Object.keys(locations[locationId].routes)
+        .filter((destinationId) => String(locationId) < destinationId)
+        .map((destinationId) => {
+          const end = locationMapPositions[destinationId as LocationId];
+          if (!start || !end) return '';
+          return `<line class="map-route" x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" />`;
+        });
+    })
+    .join('');
+
+  const nodes = locationIds
+    .map((locationId) => {
+      const location = locations[locationId];
+      const point = locationMapPositions[locationId] ?? { x: 280, y: 180 };
+      const current = locationId === player.locationId;
+      const connected = currentLocation().routes[locationId] !== undefined;
+      const command = current ? 'status' : connected ? `travel ${locationId}` : `map`;
+      const label = current ? 'CURRENT' : connected ? `${currentLocation().routes[locationId]} FUEL` : 'LOCKED';
+
+      return `
+        <g class="map-node ${current ? 'current' : ''} ${connected ? 'connected' : ''}" data-command="${command}">
+          <circle cx="${point.x}" cy="${point.y}" r="${current ? 18 : 14}" />
+          <text x="${point.x}" y="${point.y - 25}" text-anchor="middle">${location.name}</text>
+          <text x="${point.x}" y="${point.y + 34}" text-anchor="middle">${label}</text>
+        </g>
+      `;
+    })
+    .join('');
+
+  const routeList = Object.entries(currentLocation().routes)
+    .map(([destinationId, fuelCost]) => {
+      const location = locations[destinationId as LocationId];
+      return `
+        <button class="property-action-button" data-command="travel ${destinationId}">
+          Travel ${location.name} (${fuelCost} fuel)
+        </button>
+      `;
+    })
+    .join('');
+
+  logEl.innerHTML = `
+    <div class="map-panel">
+      <div class="stock-market-head">
+        <div>
+          <div class="box-subtitle">ROUTE MAP</div>
+          <div class="ledger-copy">A command-map view of known ports. Connected systems can be selected directly from the map or from the route buttons below.</div>
+        </div>
+        <div class="stock-summary">
+          <div class="stat-row"><span>Current</span><strong>${currentLocation().name}</strong></div>
+          <div class="stat-row"><span>Fuel</span><strong>${player.supplies.fuel}</strong></div>
+        </div>
+      </div>
+      <div class="map-card">
+        <svg class="route-map" viewBox="0 0 560 360" role="img" aria-label="Route map">
+          <rect class="map-background" x="0" y="0" width="560" height="360" />
+          ${routeLines}
+          ${nodes}
+        </svg>
+      </div>
+      <div class="property-actions map-actions">${routeList}</div>
+    </div>
+  `;
+
+  bindLogCommandButtons();
+}
+
+function bindLogCommandButtons(): void {
+  logEl.querySelectorAll<HTMLElement>('[data-command]').forEach((button) => {
+    button.addEventListener('click', () => {
+      executeCommand(button.dataset.command ?? '');
+    });
+  });
+}
+
 function renderStockGraph(stock: Stock): string {
   const width = 150;
   const height = 42;
@@ -1791,8 +2181,10 @@ function renderAccountScreen(): void {
 function clearActiveLog(): void {
   if (activeLogTab === 'conversation') {
     conversationEntries.length = 0;
-  } else {
+  } else if (activeLogTab === 'account') {
     accountEntries.length = 0;
+  } else {
+    activeLogTab = 'conversation';
   }
 
   renderLogPanel();
@@ -1815,6 +2207,7 @@ function renderStatus(): void {
   statusEl.innerHTML = `
     <div class="stat-row"><span>Credits</span><strong>${player.credits}</strong></div>
     <div class="stat-row"><span>Turn Income</span><strong>${incomePerTurn()}</strong></div>
+    <div class="stat-row"><span>Property Net</span><strong>${propertyIncomePerTurn()}</strong></div>
     <div class="stat-row"><span>Location</span><strong>${location.name}</strong></div>
     <div class="stat-row"><span>Vendor</span><strong>${vendor.name}</strong></div>
     <div class="stat-row"><span>Relationship</span><strong>${factionState.relationship}</strong></div>
@@ -2101,6 +2494,8 @@ function renderCommands(): void {
     { label: 'STATUS', command: 'status' },
     { label: 'BARGAIN', command: 'bargain' },
     { label: 'STOCK', command: 'stocks' },
+    { label: 'PROPERTY', command: 'property list' },
+    { label: 'MAP', command: 'map' },
     { label: 'RELATIONS', command: 'relations' },
     { label: 'END TURN', command: 'end' },
     { label: 'CLEAR LOG', command: 'clear' },
@@ -2253,6 +2648,7 @@ async function submitBargainingOffer(offer: NegotiationOffer): Promise<void> {
   bargainingState.pendingOffer = offer;
   bargainingState.pendingResult = result;
   bargainingState.message = 'Transmission sent. Awaiting faction response...';
+  activeLogTab = 'conversation';
   activeSidebarTab = 'bargain';
   render();
 
@@ -2281,6 +2677,7 @@ async function submitBargainingOffer(offer: NegotiationOffer): Promise<void> {
 }
 
 async function submitFreeformBargainingMessage(message: string): Promise<void> {
+  activeLogTab = 'conversation';
   activeSidebarTab = 'bargain';
   bargainingState.message = 'Parsing bargain into structured JSON...';
   render();
@@ -3047,6 +3444,7 @@ function travel(destinationId: string): void {
   player.supplies.fuel -= fuelCost;
   player.locationId = destination.id;
   selectedVendorId = destination.vendors[0]?.id ?? null;
+  activeLogTab = 'conversation';
   activeSidebarTab = 'market';
   influenceFactionStocks(destination.governingFaction, 0.006);
   influenceStock('sirius_ore', -0.004);
@@ -3082,6 +3480,7 @@ function addressedBargainFaction(command: string): BargainFactionId | undefined 
 function selectBargainChannel(factionId: BargainFactionId): void {
   if (!registerBargainingContact(factionId)) {
     commandMode = 'bargainTargets';
+    activeLogTab = 'conversation';
     activeSidebarTab = 'bargain';
     return;
   }
@@ -3090,6 +3489,7 @@ function selectBargainChannel(factionId: BargainFactionId): void {
   bargainingState.pendingOffer = undefined;
   bargainingState.pendingResult = undefined;
   bargainingState.message = `Channel open: ${factionStates[factionId].name}.`;
+  activeLogTab = 'conversation';
   activeSidebarTab = 'bargain';
   commandMode = 'root';
   log(`BARGAIN CHANNEL\nOpened ${factionStates[factionId].name}.`);
@@ -3109,7 +3509,7 @@ function executeCommand(command: string): void {
     log(`> ${command}`);
   }
 
-  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'stocks', 'stock', 'leverage', 'tab', 'account'].includes(action)) {
+  if (pendingEvent && !['status', 'relations', 'clear', 'ledger', 'market', 'stocks', 'stock', 'property', 'map', 'leverage', 'tab', 'account'].includes(action)) {
     resolvePendingEvent(normalizedCommand);
     render();
     return;
@@ -3117,16 +3517,20 @@ function executeCommand(command: string): void {
 
   if (action === 'status') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     showStatus();
   } else if (action === 'market') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     activeSidebarTab = 'market';
     showMarket();
   } else if (action === 'relations') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     showRelations();
   } else if (action === 'ledger') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     activeSidebarTab = 'ledger';
     showLedger();
   } else if (action === 'comms') {
@@ -3139,12 +3543,47 @@ function executeCommand(command: string): void {
   } else if (action === 'stocks') {
     commandMode = 'root';
     activeLogTab = 'stocks';
+  } else if (action === 'map') {
+    commandMode = 'root';
+    activeLogTab = 'map';
+  } else if (action === 'property') {
+    commandMode = 'root';
+    if (parts[1] === 'list' || !parts[1]) {
+      showPropertyList();
+    } else if (parts[1] === 'inspect') {
+      inspectProperty(parts[2]);
+    } else if (parts[1] === 'buy') {
+      activeLogTab = 'property';
+      buyProperty(parts[2]);
+    } else if (parts[1] === 'sell') {
+      activeLogTab = 'property';
+      sellProperty(parts[2]);
+    } else if (parts[1] === 'lease') {
+      activeLogTab = 'property';
+      leaseProperty(parts[2]);
+    } else if (parts[1] === 'release') {
+      activeLogTab = 'property';
+      releaseProperty(parts[2]);
+    } else {
+      log('Invalid property command. Use: property list, property inspect <id>, property buy <id>, property sell <id>, property lease <id>, or property release <id>.');
+    }
   } else if (action === 'tab') {
     commandMode = 'root';
-    if (parts[1] === 'ledger') activeSidebarTab = 'ledger';
-    if (parts[1] === 'market') activeSidebarTab = 'market';
-    if (parts[1] === 'bargain') activeSidebarTab = 'bargain';
+    if (parts[1] === 'ledger') {
+      activeLogTab = 'conversation';
+      activeSidebarTab = 'ledger';
+    }
+    if (parts[1] === 'market') {
+      activeLogTab = 'conversation';
+      activeSidebarTab = 'market';
+    }
+    if (parts[1] === 'bargain') {
+      activeLogTab = 'conversation';
+      activeSidebarTab = 'bargain';
+    }
     if (parts[1] === 'stocks') activeLogTab = 'stocks';
+    if (parts[1] === 'property') activeLogTab = 'property';
+    if (parts[1] === 'map') activeLogTab = 'map';
   } else if (action === 'commands') {
     commandMode = 'root';
   } else if (action === 'channel') {
@@ -3156,28 +3595,36 @@ function executeCommand(command: string): void {
     }
   } else if (action === 'vendor') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     selectVendor(parts[1] ?? '');
     return;
   } else if (action === 'resupply') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     resupply(parts[1], parts[2]);
   } else if (action === 'buy') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     buy(parts[1], parts[2]);
   } else if (action === 'sell') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     sell(parts[1], parts[2]);
   } else if (action === 'gift') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     gift(parts[1]);
   } else if (action === 'pact') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     requestTradePact();
   } else if (action === 'alliance') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     requestAlliance();
   } else if (action === 'travel') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     travel(parts[1]);
   } else if (action === 'stock') {
     commandMode = 'root';
@@ -3193,24 +3640,29 @@ function executeCommand(command: string): void {
     setStockLeverage(parts[1]);
   } else if (action === 'bargain') {
     commandMode = 'bargainTargets';
+    activeLogTab = 'conversation';
     activeSidebarTab = 'bargain';
     bargainingState.message = 'Select one faction channel. Other channels lock after contact until the next day.';
   } else if (action === 'offer' || action === 'negotiate' || action === 'trade') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     void submitFreeformBargainingMessage(command);
   } else if (action === 'end') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     endTurn();
   } else if (action === 'clear') {
     commandMode = 'root';
     clearActiveLog();
   } else if (addressedFaction) {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     bargainingState.selectedFactionId = addressedFaction;
     activeSidebarTab = 'bargain';
     void submitFreeformBargainingMessage(command);
   } else if (activeSidebarTab === 'bargain') {
     commandMode = 'root';
+    activeLogTab = 'conversation';
     void submitFreeformBargainingMessage(command);
   } else {
     log(`Unknown command: ${command}`);
